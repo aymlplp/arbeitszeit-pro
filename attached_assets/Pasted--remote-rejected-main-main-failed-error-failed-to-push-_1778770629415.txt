@@ -1,0 +1,40 @@
+ ! [remote rejected] main -> main (failed)
+error: failed to push some refs to 'https://github.com/aymlplp/lplp1.git'
+~/workspace$ ^C
+~/workspace$ ^C
+~/workspace$ git init
+Reinitialized existing Git repository in /home/runner/workspace/.git/
+~/workspace$ git remote add origin https://github.com/aymlplp/arbeitszeit-pro.git
+error: remote origin already exists.
+~/workspace$ git branch -M main
+~/workspace$ git push -u origin main
+remote: Repository not found.
+fatal: repository 'https://github.com/aymlplp/lplp1.git/' not found
+~/workspace$ git push -u origin main
+Uploading LFS objects: 100% (1/1), 208 MB | 64 MB/s, done.                                                              
+Enumerating objects: 541, done.
+Counting objects: 100% (541/541), done.
+Delta compression using up to 4 threads
+Compressing objects: 100% (515/515), done.
+Writing objects: 100% (541/541), 1.27 MiB | 3.84 MiB/s, done.
+Total 541 (delta 361), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (361/361), done.
+remote: fatal: did not receive expected object 0ca4ed76387e34808ac602bd91ffe9ddb5eec152
+error: remote unpack failed: index-pack failed
+To https://github.com/aymlplp/arbeitszeit-pro.git
+ ! [remote rejected] main -> main (failed)
+error: failed to push some refs to 'https://github.com/aymlplp/arbeitszeit-pro.git'
+~/workspace$ git merge feature
+merge: feature - not something we can merge
+~/workspace$ git merge main
+Already up to date.
+~/workspace$ git rebase
+Auto-merging arbeitszeit-react/src/components/Settings/SettingsView.jsx
+CONFLICT (content): Merge conflict in arbeitszeit-react/src/components/Settings/SettingsView.jsx
+error: could not apply e6fc8d5... Update reports to avoid CSS conflicts and organize settings into panels
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply e6fc8d5... # Update reports to avoid CSS conflicts and organize settings into panels

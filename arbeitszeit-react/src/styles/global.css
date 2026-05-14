@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --pur:   #5b4fcf;
+    --pur2:  #7c6fd4;
+    --pink:  #e8407a;
+    --cd:    #1e1854;
+    --cd2:   #2a2370;
+    --glass: rgba(255,255,255,.55);
+    --glass2:rgba(255,255,255,.85);
+    --bl:    rgba(91,79,207,.2);
+    --bl2:   rgba(91,79,207,.08);
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html, body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background: linear-gradient(135deg, #e8e0f5 0%, #d4c8f0 30%, #c9b8e8 60%, #e0c8e8 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+    color: #1e1854;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+}
+
+@layer components {
+  /* Glass morphism */
+  .glass {
+    background: rgba(255,255,255,.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.5);
+  }
+
+  .glass-light {
+    background: rgba(255,255,255,.85);
+    border: 1px solid rgba(91,79,207,.14);
+  }
+
+  /* Pill button */
+  .btn-pill {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold
+           cursor-pointer transition-all duration-150 border;
+  }
+
+  .btn-primary {
+    @apply btn-pill bg-purple-600 text-white border-transparent
+           shadow-lg shadow-purple-500/30 hover:bg-purple-900 hover:shadow-purple-500/40;
+  }
+
+  .btn-ghost {
+    @apply btn-pill bg-white/70 text-purple-700 border-purple-200
+           hover:bg-white/90;
+  }
+
+  .btn-pink {
+    @apply btn-pill bg-pink-500 text-white border-transparent
+           shadow-md shadow-pink-500/40 hover:bg-pink-600;
+  }
+
+  /* Input */
+  .inp {
+    @apply w-full bg-white/60 border border-purple-200 rounded-xl px-3 py-2
+           text-sm text-purple-900 outline-none transition-all
+           focus:border-purple-500 focus:bg-white/90 placeholder-purple-400/50;
+  }
+
+  /* Card */
+  .card {
+    @apply glass-light rounded-2xl p-4;
+  }
+
+  /* Day type badges */
+  .badge-work     { @apply bg-green-50  text-green-800  text-[10px] font-bold tracking-wide px-3 py-1 rounded-full; }
+  .badge-sick     { @apply bg-red-50    text-red-800    text-[10px] font-bold tracking-wide px-3 py-1 rounded-full; }
+  .badge-holiday  { @apply bg-blue-50   text-blue-800   text-[10px] font-bold tracking-wide px-3 py-1 rounded-full; }
+  .badge-vacation { @apply bg-indigo-50 text-indigo-800 text-[10px] font-bold tracking-wide px-3 py-1 rounded-full; }
+
+  /* Entry table inputs */
+  .e-inp {
+    @apply w-full bg-purple-50/50 border border-purple-100 rounded-lg px-2 py-1.5
+           text-xs text-center text-purple-900 outline-none
+           focus:border-purple-400 focus:bg-white transition-all;
+  }
+
+  /* Summary dark card */
+  .sum-card {
+    background: #1e1854;
+    @apply rounded-2xl p-5 text-white;
+  }
+
+  /* Nav pill */
+  .nav-circle {
+    @apply w-8 h-8 rounded-full flex items-center justify-center cursor-pointer
+           bg-white/60 border border-purple-200 text-purple-600
+           hover:bg-white/90 transition-all text-base leading-none;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(91,79,207,.3); border-radius: 4px; }
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #5b4fcf, #e8407a);
+  }
+
+  .bg-app {
+    background: linear-gradient(135deg, #e8e0f5 0%, #d4c8f0 30%, #c9b8e8 60%, #e0c8e8 100%);
+    background-attachment: fixed;
+  }
+}
+
+/* Animations */
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.anim-up  { animation: slideUp .25s ease both; }
+.anim-in  { animation: fadeIn  .2s  ease both; }
+.anim-spin{ animation: spin    .7s  linear infinite; }
+
+/* Print */
+@media print {
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
+}
