@@ -74,8 +74,8 @@ const useAppStore = create(
 
       async doSave() {
         const { aData, aYear, settings, areas, acts, archivedYears, lang, currentUser } = get()
-        if (!currentUser) {
-          // Offline: saved via persist middleware (localStorage)
+        if (!currentUser || currentUser.plan !== 'pro') {
+          // Offline or Free plan: saved locally via persist middleware (localStorage)
           return
         }
         try {

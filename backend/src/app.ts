@@ -9,6 +9,8 @@ import authRoutes from './routes/auth.routes';
 import dataRoutes from './routes/data.routes';
 import stripeRoutes from './routes/stripe.routes';
 
+import { handleWebhook } from './controllers/stripe.controller';
+
 const app = express();
 
 // Security Middlewares
@@ -17,6 +19,9 @@ app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
+
+// Stripe Webhook (Requires raw body parser BEFORE general express.json middleware)
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 
 // Rate Limiter
 const apiLimiter = rateLimit({

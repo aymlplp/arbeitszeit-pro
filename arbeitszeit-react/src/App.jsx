@@ -14,6 +14,7 @@ import ArchiveView  from '@/components/Archive/ArchiveView'
 import AuthFlow     from '@/components/Auth/AuthFlow'
 import MobileSignView from '@/components/Settings/MobileSignView'
 import { getAccessToken, setAuthToken } from '@/lib/auth'
+import { CalendarDays, FileSpreadsheet, Coins, Settings as LucideSettings } from 'lucide-react'
 
 const MAIN_TABS = ['zeit', 'rep', 'sal']
 
@@ -26,6 +27,14 @@ export default function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const mobileSignToken = urlParams.get('mobileSignToken')
+    const mobileSignTopic = urlParams.get('mobileSignTopic')
+
+    if (mobileSignTopic) {
+      // Ephemeral offline signing bypasses auth
+      setAuthChecked(true)
+      return
+    }
+
     if (mobileSignToken) {
       setAuthToken(mobileSignToken)
       authInit().then(user => {
@@ -82,10 +91,11 @@ export default function App() {
   )
 
   const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('mobileSignToken')) {
+  const mobileSignTopic = urlParams.get('mobileSignTopic')
+  if (urlParams.get('mobileSignToken') || mobileSignTopic) {
     return (
       <>
-        <MobileSignView />
+        <MobileSignView topic={mobileSignTopic} />
         <Toaster position="bottom-center" toastOptions={{style:{borderRadius:'20px'}}}/>
       </>
     )
@@ -110,7 +120,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen" style={{background:'linear-gradient(135deg,#e8e0f5,#d4c8f0,#c9b8e8,#e0c8e8)',backgroundAttachment:'fixed'}}>
-      <div className="max-w-2xl mx-auto px-3 py-3 pb-12">
+      <div className="max-w-3xl mx-auto px-3 py-3 pb-24 sm:pb-12">
 
         <Header
           t={t}
@@ -130,9 +140,9 @@ export default function App() {
           </div>
         )}
 
-        {/* Main tabs — only show when on a main tab */}
+        {/* Main tabs — only show when on a main tab (hidden on mobile, shown on desktop) */}
         {MAIN_TABS.includes(activeTab) && (
-          <div className="flex gap-2 mb-3">
+          <div className="hidden sm:flex gap-2 mb-3">
             {TAB_CFG.map(tab => (
               <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-sm font-semibold cursor-pointer transition-all border
@@ -154,6 +164,37 @@ export default function App() {
             {renderContent()}
           </motion.div>
         </AnimatePresence>
+      </div>
+
+      {/* Premium Fixed Mobile Bottom Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 z-[100] bg-white/90 backdrop-blur-xl shadow-[0_-5px_20px_rgba(48,36,100,0.06)] border-t border-purple-100/60 px-2 py-2 pb-safe sm:hidden flex items-center justify-around select-none">
+        {[
+          { id: 'zeit', icon: CalendarDays,    lbl: { de:'Zeit', en:'Time', ar:'الوقت' } },
+          { id: 'rep',  icon: FileSpreadsheet, lbl: { de:'Berichte', en:'Reports', ar:'التقارير' } },
+          { id: 'sal',  icon: Coins,           lbl: { de:'Gehalt', en:'Salary', ar:'الراتب' } },
+          { id: 'set',  icon: LucideSettings,  lbl: { de:'Einstell.', en:'Settings', ar:'الإعدادات' } },
+        ].map(item => {
+          const Icon = item.icon
+          const isActive = item.id === 'set' 
+            ? (activeTab === 'set' || activeTab === 'arch') 
+            : activeTab === item.id
+          
+          const label = item.lbl[lang] || item.lbl.de
+          
+          return (
+            <button key={item.id} onClick={() => setActiveTab(item.id)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-0.5 cursor-pointer transition-all duration-150 active:scale-95 
+                ${isActive ? 'text-purple-700 font-bold' : 'text-purple-400 hover:text-purple-500 font-medium'}`}>
+              <div className={`p-1.5 rounded-xl transition-all duration-300 relative flex items-center justify-center ${isActive ? 'bg-purple-600/10' : ''}`}>
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`transition-all duration-300 ${isActive ? 'scale-110 text-purple-600' : ''}`} />
+                {isActive && (
+                  <motion.div layoutId="activeMobileTab" className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-purple-600" transition={{type:'spring',stiffness:380,damping:30}} />
+                )}
+              </div>
+              <span className="text-[9px] tracking-tight leading-none max-w-full truncate px-0.5">{label}</span>
+            </button>
+          )
+        })}
       </div>
 
       <Toaster position="bottom-center" toastOptions={{

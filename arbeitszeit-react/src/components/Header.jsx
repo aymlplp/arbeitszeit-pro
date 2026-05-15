@@ -68,8 +68,7 @@ export default function Header({ t, onOpenAreas, onOpenArchive, onLogout }) {
 
         <button onClick={onOpenAreas}
           className="inline-flex items-center gap-1 bg-white/70 border border-purple-200 rounded-full px-2.5 py-1.5 text-xs font-semibold text-purple-700 hover:bg-white/90 transition-all cursor-pointer">
-          ⇄ {lang==='ar'?'المناطق':lang==='en'?'Areas':'Bereiche'}
-          <span className="bg-purple-600 text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold ml-0.5">{areas.length}</span>
+          ⚙️ {lang==='ar'?'الإعدادات':lang==='en'?'Settings':'Einstellungen'}
         </button>
 
         <button onClick={onOpenArchive}

@@ -71,6 +71,10 @@ export default function EntryTable({ t, isoKey, dayData }) {
          if (selectedAreaObj.start) newEntry.start = selectedAreaObj.start;
          if (selectedAreaObj.end) newEntry.end = selectedAreaObj.end;
       }
+      // Prioritize 'UR' as the default activity when selecting a work area
+      if (acts.includes('UR')) {
+        newEntry.activity = 'UR';
+      }
     }
 
     const updated = entries.map((e,idx)=> idx===i ? newEntry : e)
@@ -82,21 +86,14 @@ export default function EntryTable({ t, isoKey, dayData }) {
   }, [entries, dayData, isoKey, updateDayData])
 
   const addEntry = useCallback(() => {
-    let { start, end } = getNextAvailableTime()
-    const firstArea = areas[0] || '';
-    const areaName = typeof firstArea === 'string' ? firstArea : firstArea.name;
-    
-    if (typeof firstArea === 'object') {
-       if (firstArea.start) start = firstArea.start;
-       if (firstArea.end) end = firstArea.end;
-    }
-    
-    const newEntry = {area: areaName, activity:acts[0]||'', start, end, pause:0, fahrt:0}
+    const { start, end } = getNextAvailableTime()
+    const defAct = acts.includes('UR') ? 'UR' : (acts[0] || '')
+    const newEntry = {area: '', activity: defAct, start, end, pause:0, fahrt:0}
     updateDayData(isoKey, {...dayData, entries:[...entries, newEntry]})
-  }, [entries, dayData, isoKey, areas, acts, updateDayData])
+  }, [entries, dayData, isoKey, acts, updateDayData])
 
-  const INP = 'w-full bg-purple-50/60 border border-purple-100 rounded-lg px-1.5 py-1.5 text-xs text-center text-purple-900 outline-none focus:border-purple-400 focus:bg-white transition-all'
-  const TIME_INP = 'w-full bg-purple-50/60 border border-purple-100 rounded-lg px-0.5 py-1.5 text-sm font-semibold text-center text-purple-900 outline-none focus:border-purple-400 focus:bg-white transition-all tracking-tight'
+  const INP = 'w-full bg-purple-50/60 border border-purple-100 rounded-lg px-1 py-1 sm:px-1.5 sm:py-1.5 text-[10px] sm:text-xs text-center text-purple-900 outline-none focus:border-purple-400 focus:bg-white transition-all'
+  const TIME_INP = 'w-full bg-purple-50/60 border border-purple-100 rounded-lg px-0.5 py-1 sm:py-1.5 text-[11px] sm:text-sm font-semibold text-center text-purple-900 outline-none focus:border-purple-400 focus:bg-white transition-all tracking-tight'
   const HDR = 'text-[9px] font-bold tracking-wide text-purple-400/70 uppercase'
 
   const lbl = k => {
@@ -122,10 +119,10 @@ export default function EntryTable({ t, isoKey, dayData }) {
   }
 
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="min-w-[480px]">
-        {/* Header */}
-        <div className="grid gap-1.5 mb-2 items-end" style={{gridTemplateColumns:'minmax(90px, 1.4fr) minmax(70px, 1fr) 95px 95px 60px 60px 28px'}}>
+    <div className="w-full sm:overflow-x-auto pb-2">
+      <div className="w-full sm:min-w-[480px]">
+        {/* Header (Visible only on desktop tables) */}
+        <div className="hidden sm:grid gap-1.5 mb-2 items-end" style={{gridTemplateColumns:'minmax(90px, 1.4fr) minmax(70px, 1fr) 95px 95px 60px 60px 28px'}}>
           <span className={HDR}>{lbl('area')}</span>
           <span className={HDR}>{lbl('activity')}</span>
           <span className={`${HDR} text-center`}>{lbl('start')}</span>
@@ -136,101 +133,114 @@ export default function EntryTable({ t, isoKey, dayData }) {
         </div>
 
         {entries.length===0 && (
-        <div className="text-center text-xs text-purple-300 py-2 italic">
-          {t.noEntries||'Keine Einträge'}
-        </div>
-      )}
+          <div className="text-center text-xs text-purple-300 py-3 italic">
+            {t.noEntries||'Keine Einträge'}
+          </div>
+        )}
 
-      {entries.map((e,i) => {
-        const mins = calcEntryMins(e)
-        const pauseH = parseFloat(e.pause)||0
-        const fahrtH = parseFloat(e.fahrt)||0
-        return (
-          <div key={i} className="grid gap-1.5 mb-1.5 items-center"
-            style={{gridTemplateColumns:'minmax(90px, 1.4fr) minmax(70px, 1fr) 95px 95px 60px 60px 28px'}}>
+        {entries.map((e, i) => {
+          const mins = calcEntryMins(e)
+          const pauseH = parseFloat(e.pause)||0
+          const fahrtH = parseFloat(e.fahrt)||0
+          return (
+            <div key={i} 
+              className="grid grid-cols-12 gap-x-1 gap-y-1.5 sm:gap-y-0 items-center p-2.5 sm:p-0 mb-2.5 sm:mb-1.5 rounded-2xl sm:rounded-none bg-white/65 sm:bg-transparent border border-purple-100/70 sm:border-none shadow-[0_3px_10px_rgba(124,58,237,0.02)] sm:shadow-none sm:grid-cols-[minmax(90px,1.4fr)_minmax(70px,1fr)_95px_95px_60px_60px_28px]">
 
-            {/* Area */}
-            <select value={e.area||''} onChange={ev=>updateEntry(i,'area',ev.target.value)}
-              className={`${INP} text-left`}>
-              {areas.map(a=>{
-                const name = typeof a === 'string' ? a : a.name;
-                return <option key={name} value={name}>{name}</option>
-              })}
-            </select>
+              {/* Area */}
+              <div className="col-span-9 sm:col-auto flex flex-col gap-0.5">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase px-1">{lbl('area')}</span>
+                <select value={e.area||''} onChange={ev=>updateEntry(i,'area',ev.target.value)}
+                  className={`${INP} text-left ${!e.area ? '!text-purple-400 italic' : ''}`}>
+                  <option value="">{t._lang==='ar'?'--- اختر ---':t._lang==='en'?'--- Select ---':'--- Wählen ---'}</option>
+                  {areas.map(a=>{
+                    const name = typeof a === 'string' ? a : a.name;
+                    return <option key={name} value={name}>{name}</option>
+                  })}
+                </select>
+              </div>
 
-            {/* Activity */}
-            <select value={e.activity||''} onChange={ev=>updateEntry(i,'activity',ev.target.value)}
-              className={`${INP} text-left text-[10px]`}>
-              {acts.map(a=><option key={a}>{a}</option>)}
-            </select>
+              {/* Activity */}
+              <div className="col-span-3 sm:col-auto flex flex-col gap-0.5">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase px-1">{lbl('activity')}</span>
+                <select value={e.activity||''} onChange={ev=>updateEntry(i,'activity',ev.target.value)}
+                  className={`${INP} text-left text-[10px]`}>
+                  {acts.map(a=><option key={a}>{a}</option>)}
+                </select>
+              </div>
 
-            {/* Start */}
-            <div className="relative pb-3">
-              <input type="time" step="60" value={e.start||''}
-                onChange={ev=>updateEntry(i,'start',ev.target.value)}
-                className={`${TIME_INP} ${checkOverlap(entries, e, i) ? 'border-red-400 text-red-600 bg-red-50' : ''}`}/>
-              <div className="absolute -bottom-1 left-0 right-0 text-center text-[8.5px] font-medium text-purple-400">
-                {getAmPm(e.start)}
+              {/* Start */}
+              <div className="col-span-3 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase px-1 text-center truncate">{lbl('start')}</span>
+                <input type="time" step="60" value={e.start||''}
+                  onChange={ev=>updateEntry(i,'start',ev.target.value)}
+                  className={`${TIME_INP} ${checkOverlap(entries, e, i) ? 'border-red-400 text-red-600 bg-red-50' : ''}`}/>
+                <div className="absolute bottom-0 left-0 right-0 text-center text-[8px] font-medium text-purple-400 truncate px-0.5">
+                  {getAmPm(e.start)}
+                </div>
+              </div>
+
+              {/* End + duration */}
+              <div className="col-span-3 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase px-1 text-center truncate">{lbl('end')}</span>
+                <input type="time" step="60" value={e.end||''}
+                  onChange={ev=>updateEntry(i,'end',ev.target.value)}
+                  className={`${TIME_INP} ${checkOverlap(entries, e, i) ? 'border-red-400 text-red-600 bg-red-50' : ''}`}/>
+                {mins>0 ? (
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-[8.5px] font-bold text-purple-500">
+                    {minsToHHMM(mins)}
+                  </div>
+                ) : (
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-[8px] font-medium text-purple-400 truncate px-0.5">
+                    {getAmPm(e.end)}
+                  </div>
+                )}
+              </div>
+
+              {/* Pause in hours */}
+              <div className="col-span-2 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase text-center truncate">{t._lang==='ar'?'استراحة':t._lang==='en'?'Break':'Pause'}</span>
+                <input type="number" min="0" max="12" step="0.5"
+                  value={e.pause??0}
+                  onChange={ev=>updateEntry(i,'pause',ev.target.value)}
+                  className={INP}
+                  title={pauseH>0 ? hoursToHHMM(pauseH) : ''}/>
+                {pauseH>0 && (
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-[8.5px] font-semibold text-orange-500">
+                    {hoursToHHMM(pauseH)}
+                  </div>
+                )}
+              </div>
+
+              {/* Fahrt in hours */}
+              <div className="col-span-2 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
+                <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase text-center truncate">{t._lang==='ar'?'قيادة':t._lang==='en'?'Drive':'Fahrt'}</span>
+                <input type="number" min="0" max="12" step="0.5"
+                  value={e.fahrt??0}
+                  onChange={ev=>updateEntry(i,'fahrt',ev.target.value)}
+                  className={INP}
+                  title={fahrtH>0 ? hoursToHHMM(fahrtH) : ''}/>
+                {fahrtH>0 && (
+                  <div className="absolute bottom-0 left-0 right-0 text-center text-[8.5px] font-semibold text-blue-500">
+                    {hoursToHHMM(fahrtH)}
+                  </div>
+                )}
+              </div>
+
+              {/* Delete */}
+              <div className="col-span-2 sm:col-auto flex flex-col justify-center items-center sm:pt-0 pt-2.5">
+                <button onClick={()=>deleteEntry(i)}
+                  className="w-7 h-7 rounded-xl bg-red-50 sm:bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 hover:text-red-600 transition-all text-sm cursor-pointer">
+                  ×
+                </button>
               </div>
             </div>
+          )
+        })}
 
-            {/* End + duration */}
-            <div className="relative pb-3">
-              <input type="time" step="60" value={e.end||''}
-                onChange={ev=>updateEntry(i,'end',ev.target.value)}
-                className={`${TIME_INP} ${checkOverlap(entries, e, i) ? 'border-red-400 text-red-600 bg-red-50' : ''}`}/>
-              {mins>0 ? (
-                <div className="absolute -bottom-1 left-0 right-0 text-center text-[9px] font-bold text-purple-500">
-                  {minsToHHMM(mins)}
-                </div>
-              ) : (
-                <div className="absolute -bottom-1 left-0 right-0 text-center text-[8.5px] font-medium text-purple-400">
-                  {getAmPm(e.end)}
-                </div>
-              )}
-            </div>
-
-            {/* Pause in hours */}
-            <div className="relative pb-3">
-              <input type="number" min="0" max="12" step="0.5"
-                value={e.pause??0}
-                onChange={ev=>updateEntry(i,'pause',ev.target.value)}
-                className={INP}
-                title={pauseH>0 ? hoursToHHMM(pauseH) : ''}/>
-              {pauseH>0 && (
-                <div className="absolute -bottom-1 left-0 right-0 text-center text-[9px] font-semibold text-orange-500">
-                  {hoursToHHMM(pauseH)}
-                </div>
-              )}
-            </div>
-
-            {/* Fahrt in hours */}
-            <div className="relative pb-3">
-              <input type="number" min="0" max="12" step="0.5"
-                value={e.fahrt??0}
-                onChange={ev=>updateEntry(i,'fahrt',ev.target.value)}
-                className={INP}
-                title={fahrtH>0 ? hoursToHHMM(fahrtH) : ''}/>
-              {fahrtH>0 && (
-                <div className="absolute -bottom-1 left-0 right-0 text-center text-[9px] font-semibold text-blue-500">
-                  {hoursToHHMM(fahrtH)}
-                </div>
-              )}
-            </div>
-
-            {/* Delete */}
-            <button onClick={()=>deleteEntry(i)}
-              className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center text-red-400 hover:bg-red-100 transition-all text-sm cursor-pointer self-start mt-0.5">
-              ×
-            </button>
-          </div>
-        )
-      })}
-
-      <button onClick={addEntry}
-        className="mt-2 w-full py-2.5 rounded-xl border-2 border-dashed border-purple-300 text-xs font-bold text-purple-500 hover:bg-purple-50 hover:text-purple-700 transition-all cursor-pointer">
-        {t.addEntry||'+ Eintrag hinzufügen'}
-      </button>
+        <button onClick={addEntry}
+          className="mt-2.5 w-full py-2 sm:py-2.5 rounded-xl border-2 border-dashed border-purple-300 text-[11px] sm:text-xs font-bold text-purple-500 hover:bg-purple-50 hover:text-purple-700 transition-all cursor-pointer">
+          {t.addEntry||'+ Eintrag hinzufügen'}
+        </button>
       </div>
     </div>
   )

@@ -55,3 +55,60 @@ export const createPortalSession = async (req: AuthRequest, res: Response, next:
     next(error);
   }
 };
+
+export const handleWebhook = async (req: Request, res: Response, next: NextFunction) => {
+  const sig = req.headers['stripe-signature'];
+  let event: any;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body, // This is a raw buffer due to express.raw parser
+      sig as string,
+      process.env.STRIPE_WEBHOOK_SECRET || 'whsec_dummy'
+    );
+  } catch (err: any) {
+    console.error(`[Stripe Webhook Error]: ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  try {
+    console.log(`[Stripe Event Received]: ${event.type}`);
+
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as any;
+        const customerId = session.customer as string;
+
+        if (customerId) {
+          await prisma.user.update({
+            where: { stripeCustId: customerId },
+            data: { plan: 'PRO' },
+          });
+          console.log(`[Stripe] User with CustomerId ${customerId} upgraded to PRO`);
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as any;
+        const customerId = subscription.customer as string;
+
+        if (customerId) {
+          const isPro = subscription.status === 'active' || subscription.status === 'trialing';
+          await prisma.user.update({
+            where: { stripeCustId: customerId },
+            data: { plan: isPro ? 'PRO' : 'FREE' },
+          });
+          console.log(`[Stripe] User with CustomerId ${customerId} plan set to: ${isPro ? 'PRO' : 'FREE'}`);
+        }
+        break;
+      }
+    }
+
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error(`[Stripe Webhook Processing Error]:`, error);
+    next(error);
+  }
+};

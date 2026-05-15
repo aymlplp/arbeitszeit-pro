@@ -21,10 +21,22 @@ enum Plan {
 model User {
   id            String       @id @default(uuid())
   email         String       @unique
+  name          String?
   passwordHash  String
   role          Role         @default(USER)
   plan          Plan         @default(FREE)
   stripeCustId  String?      @unique
+
+  // Email verification
+  emailVerified           Boolean   @default(false)
+  verificationCode        String?
+  verificationCodeExpiry  DateTime?
+
+  // Password reset
+  resetToken              String?   @unique
+  resetTokenExpiry        DateTime?
+
+  refreshTokenId String?
   yearData      YearData[]
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt

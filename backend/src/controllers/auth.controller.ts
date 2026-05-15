@@ -1,113 +1,299 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '../config/db';
 import { generateTokens } from '../utils/token.utils';
-import { sendWelcomeEmail } from '../utils/email.utils';
+import { 
+  sendWelcomeEmail, 
+  sendVerificationEmail, 
+  sendPasswordResetEmail 
+} from '../utils/email.utils';
 
+// Stateful session configuration with production cross-domain support
+const PROD = process.env.NODE_ENV === 'production';
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function gen6DigitCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function formatUser(u: any) {
+  return { id: u.id, email: u.email, name: u.name, role: u.role, plan: u.plan };
+}
+
+async function issueSession(res: Response, userId: string) {
+  const { accessToken, refreshToken, jti } = generateTokens(userId);
+
+  // Persist the unique session key to database, invalidating previous tokens
+  await prisma.user.update({
+    where: { id: userId },
+    data:  { refreshTokenId: jti },
+  });
+
+  res.cookie('refreshToken', refreshToken, {
+    httpOnly: true,
+    secure:   PROD,
+    sameSite: PROD ? 'none' : 'strict', // 'none' allows cross-domain Vercel ↔ API connection
+    maxAge:   7 * 24 * 60 * 60 * 1000,
+  });
+
+  return accessToken;
+}
+
+// ── REGISTER ─────────────────────────────────────────────────────────────────
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, name, plan } = req.body;
 
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User already exists' });
-    }
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) return res.status(400).json({ error: 'Email already in use' });
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcrypt.hash(password, 12);
+    const code   = gen6DigitCode();
+    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
     const user = await prisma.user.create({
-      data: {
-        email,
-        passwordHash,
+      data: { 
+        email, 
+        name, 
+        passwordHash, 
+        verificationCode: code, 
+        verificationCodeExpiry: expiry,
+        plan: (plan?.toUpperCase() === 'PRO') ? 'PRO' : 'FREE'
       },
     });
 
-    const { accessToken, refreshToken } = generateTokens(user.id);
-    sendWelcomeEmail(user.email);
+    sendVerificationEmail(user.email, user.name, code).catch(() => null);
 
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.status(201).json({
-      success: true,
-      user: { id: user.id, email: user.email, role: user.role, plan: user.plan },
-      accessToken,
-    });
-  } catch (error) {
-    next(error);
+    res.status(201).json({ success: true, needsVerification: true, userId: user.id });
+  } catch (err) {
+    next(err);
   }
 };
 
+// ── VERIFY EMAIL ─────────────────────────────────────────────────────────────
+export const verifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId, code } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    if (user.emailVerified) {
+      const accessToken = await issueSession(res, user.id);
+      return res.status(200).json({ success: true, user: formatUser(user), accessToken });
+    }
+
+    if (!user.verificationCode || user.verificationCode !== code) {
+      return res.status(400).json({ error: 'Invalid verification code' });
+    }
+
+    if (!user.verificationCodeExpiry || user.verificationCodeExpiry < new Date()) {
+      return res.status(400).json({ error: 'Code expired — request a new one' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data:  { emailVerified: true, verificationCode: null, verificationCodeExpiry: null },
+    });
+
+    sendWelcomeEmail(updated.email, updated.name).catch(() => null);
+
+    const accessToken = await issueSession(res, updated.id);
+    res.status(200).json({ success: true, user: formatUser(updated), accessToken });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── RESEND CODE ──────────────────────────────────────────────────────────────
+export const resendCode = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { userId } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user)              return res.status(404).json({ error: 'User not found' });
+    if (user.emailVerified) return res.status(400).json({ error: 'Email already verified' });
+
+    const code   = gen6DigitCode();
+    const expiry = new Date(Date.now() + 15 * 60 * 1000);
+
+    await prisma.user.update({ 
+      where: { id: userId }, 
+      data: { verificationCode: code, verificationCodeExpiry: expiry } 
+    });
+    
+    sendVerificationEmail(user.email, user.name, code).catch(() => null);
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── LOGIN ────────────────────────────────────────────────────────────────────
 export const login = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password } = req.body;
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+    if (!user.emailVerified) {
+      const code   = gen6DigitCode();
+      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      await prisma.user.update({ 
+        where: { id: user.id }, 
+        data: { verificationCode: code, verificationCodeExpiry: expiry } 
+      });
+      sendVerificationEmail(user.email, user.name, code).catch(() => null);
+      return res.status(403).json({ code: 'UNVERIFIED', userId: user.id });
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!isValidPassword) {
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const { accessToken, refreshToken } = generateTokens(user.id);
-
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.status(200).json({
-      success: true,
-      user: { id: user.id, email: user.email, role: user.role, plan: user.plan },
-      accessToken,
-    });
-  } catch (error) {
-    next(error);
+    const accessToken = await issueSession(res, user.id);
+    res.status(200).json({ success: true, user: formatUser(user), accessToken });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const logout = (req: Request, res: Response) => {
-  res.clearCookie('refreshToken');
-  res.status(200).json({ success: true, message: 'Logged out successfully' });
+// ── LOGOUT ───────────────────────────────────────────────────────────────────
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies?.refreshToken as string | undefined;
+    if (token) {
+      const payload = jwt.decode(token) as { userId?: string } | null;
+      if (payload?.userId) {
+        // Clear tracking session completely from the database upon logout
+        await prisma.user.update({
+          where: { id: payload.userId },
+          data:  { refreshTokenId: null },
+        }).catch(() => null);
+      }
+    }
+  } catch {}
+
+  res.clearCookie('refreshToken', {
+    httpOnly: true,
+    secure:   PROD,
+    sameSite: PROD ? 'none' : 'strict',
+  });
+  res.status(200).json({ success: true });
 };
 
+// ── REFRESH TOKEN ────────────────────────────────────────────────────────────
 export const refresh = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken) return res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'No refresh token' });
+    const token = req.cookies?.refreshToken as string | undefined;
+    if (!token) return res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'No refresh token' });
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET as string) as { userId: string };
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.userId);
+    let decoded: { userId: string; jti: string };
+    try {
+      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET as string) as any;
+    } catch {
+      return res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'Invalid refresh token' });
+    }
 
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+    // ── Stateful Enforcement: Verify the token jti matches database tracking ──
+    const user = await prisma.user.findUnique({
+      where:  { id: decoded.userId },
+      select: { id: true, refreshTokenId: true },
     });
 
+    if (!user || user.refreshTokenId !== decoded.jti) {
+      // Possible session compromise/replay: wipe all session states as precaution
+      if (user) {
+        await prisma.user.update({ where: { id: user.id }, data: { refreshTokenId: null } }).catch(() => null);
+      }
+      res.clearCookie('refreshToken', { httpOnly: true, secure: PROD, sameSite: PROD ? 'none' : 'strict' });
+      return res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'Session expired — please log in again' });
+    }
+
+    // Successful verification: Rotate session token and persist updated jti
+    const accessToken = await issueSession(res, decoded.userId);
     res.status(200).json({ accessToken });
-  } catch (error) {
-    res.status(401).json({ code: 'TOKEN_EXPIRED', message: 'Invalid refresh token' });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const me = async (req: Request, res: Response, next: NextFunction) => {
+// ── ME ───────────────────────────────────────────────────────────────────────
+export const me = async (req: any, res: Response, next: NextFunction) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: (req as any).user.userId } });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    
-    res.status(200).json({ user: { id: user.id, email: user.email, role: user.role, plan: user.plan } });
-  } catch (error) {
-    next(error);
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.status(200).json({ user: formatUser(user) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { email } = req.body;
+    const GENERIC = { success: true, message: 'If this email exists, a reset link was sent.' };
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(200).json(GENERIC);
+
+    const token  = crypto.randomBytes(32).toString('hex');
+    const expiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.user.update({ where: { id: user.id }, data: { resetToken: token, resetTokenExpiry: expiry } });
+    sendPasswordResetEmail(user.email, user.name, token).catch(() => null);
+
+    res.status(200).json(GENERIC);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── RESET PASSWORD ───────────────────────────────────────────────────────────
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { token, password } = req.body;
+
+    const user = await prisma.user.findFirst({ where: { resetToken: token } });
+    if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
+      return res.status(400).json({ error: 'Invalid or expired reset link.' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { passwordHash, resetToken: null, resetTokenExpiry: null, refreshTokenId: null },
+    });
+
+    res.status(200).json({ success: true, message: 'Password updated. Please log in again.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── CHANGE PASSWORD ─────────────────────────────────────────────────────────
+export const changePassword = async (req: any, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) return res.status(400).json({ error: 'Current password is incorrect' });
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data:  { passwordHash, refreshTokenId: null },
+    });
+
+    res.status(200).json({ success: true, message: 'Password changed. Please log in again.' });
+  } catch (err) {
+    next(err);
   }
 };

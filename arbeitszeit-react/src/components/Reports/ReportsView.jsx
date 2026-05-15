@@ -4,6 +4,8 @@ import useAppStore from '@/store/useAppStore'
 import { DAY_FULL, MONTHS } from '@/lib/i18n'
 import { getWeekDates, getISODate, getKW, getMondayByOffset, minsToHHMM } from '@/lib/utils'
 import { NavCircle } from '@/components/UI'
+import toast from 'react-hot-toast'
+import { startCheckout } from '@/lib/auth'
 
 const RCLS = { sick:'rsk', holiday:'rho', vacation:'rva' }
 
@@ -28,7 +30,8 @@ th,td{border:1px solid #bbb;padding:3px 5px;text-align:center;white-space:nowrap
 `
 
 export default function ReportsView({ t }) {
-  const { aData, lang, settings } = useAppStore()
+  const { aData, lang, settings, currentUser } = useAppStore()
+  const isPro = currentUser?.plan === 'pro'
   const [repType, setRepType] = useState('wk')
   const [rWO, setRWO] = useState(0)
   const [rMO, setRMO] = useState(0)
@@ -358,6 +361,10 @@ export default function ReportsView({ t }) {
   }
 
   const doPrint=()=>{
+    if (!isPro) {
+      toast.error(lang === 'ar' ? 'طباعة التقارير وحفظها بصيغة PDF تتطلب اشتراك PRO.' : lang === 'en' ? 'Printing reports requires a PRO subscription.' : 'Das Drucken von Berichten erfordert ein PRO-Abonnement.')
+      return
+    }
     let sigHtml = ''
     if (settings.signature) {
       sigHtml = `<div class="sig-box">
@@ -375,9 +382,9 @@ export default function ReportsView({ t }) {
 
   const TABS=[
     {id:'wk',label:lang==='ar'?'تقرير أسبوعي':lang==='en'?'Weekly':'Wochenbericht'},
-    {id:'mc',label:lang==='ar'?'الشهر مجمع':lang==='en'?'Month comb.':'Monat komb.'},
-    {id:'mo',label:lang==='ar'?'تقرير شهري':lang==='en'?'Monthly':'Monatsbericht'},
-    {id:'yr',label:lang==='ar'?'تقرير سنوي':lang==='en'?'Yearly':'Jahresbericht'},
+    {id:'mc',label:lang==='ar'?'الشهر مجمع 👑':lang==='en'?'Month comb. 👑':'Monat komb. 👑'},
+    {id:'mo',label:lang==='ar'?'تقرير شهري 👑':lang==='en'?'Monthly 👑':'Monatsbericht 👑'},
+    {id:'yr',label:lang==='ar'?'تقرير سنوي 👑':lang==='en'?'Yearly 👑':'Jahresbericht 👑'},
   ]
 
   const INLINE=`
@@ -401,7 +408,13 @@ export default function ReportsView({ t }) {
       {/* Tabs */}
       <div className="flex gap-1.5 mb-3 flex-wrap">
         {TABS.map(tb=>(
-          <button key={tb.id} onClick={()=>setRepType(tb.id)}
+          <button key={tb.id} onClick={()=>{
+            if (tb.id !== 'wk' && !isPro) {
+              toast.error(lang === 'ar' ? 'التقارير المتقدمة متوفرة في نسخة PRO فقط!' : lang === 'en' ? 'Advanced reports are only available in PRO version!' : 'Erweiterte Berichte sind nur in der PRO-Version verfügbar!')
+              return
+            }
+            setRepType(tb.id)
+          }}
             className={`px-3 py-1.5 text-xs font-semibold rounded-full border cursor-pointer transition-all
               ${repType===tb.id?'bg-amber-400 border-amber-500 text-amber-900':'bg-white/70 border-purple-200 text-purple-600 hover:bg-white/90'}`}>
             {tb.label}
@@ -415,8 +428,8 @@ export default function ReportsView({ t }) {
         <NavCircle onClick={()=>nav(1)}>›</NavCircle>
         <div className="flex-1 text-sm font-bold text-purple-900 text-center">{period}</div>
         <button onClick={doPrint}
-          className="px-3 py-1.5 text-xs font-semibold bg-blue-50 border border-blue-300 text-blue-700 rounded-full hover:bg-blue-100 cursor-pointer transition-all">
-          🖨 {lang==='ar'?'طباعة':lang==='en'?'Print':'Drucken'}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-full border cursor-pointer transition-all ${!isPro ? 'bg-purple-50 border-purple-200 text-purple-500 opacity-80 hover:bg-purple-100' : 'bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100'}`}>
+          {!isPro ? '🔒' : '🖨'} {lang==='ar'?'طباعة':lang==='en'?'Print':'Drucken'}
         </button>
       </div>
 

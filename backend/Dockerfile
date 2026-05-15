@@ -1,33 +1,42 @@
+# ─── Stage 1: Builder ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package info
+# Install deps first (better layer caching)
 COPY package*.json ./
 COPY prisma ./prisma/
-
-# Install dependencies
 RUN npm ci
 
-# Copy source code
+# Copy source and build
 COPY . .
-
-# Generate Prisma Client and build TS
 RUN npx prisma generate
 RUN npm run build
 
-# Production stage
-FROM node:20-alpine
+# ─── Stage 2: Production ───────────────────────────────────────────────────────
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copy built artifacts from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/prisma ./prisma
+# Non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser  -u 1001 -S nodejs -G nodejs
 
-EXPOSE 5000
+# Copy only what's needed for production
+COPY --from=builder --chown=nodejs:nodejs /app/dist          ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules  ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package.json  ./
+COPY --from=builder --chown=nodejs:nodejs /app/prisma        ./prisma
+COPY --chown=nodejs:nodejs docker-entrypoint.sh              ./
 
-# Start script, ideally you run migrations in a startup script or CI
-CMD ["npm", "run", "start"]
+RUN chmod +x docker-entrypoint.sh
+
+USER nodejs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD wget -qO- http://localhost:3000/api/health || exit 1
+
+ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "dist/server.js"]

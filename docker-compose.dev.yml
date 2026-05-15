@@ -1,0 +1,42 @@
+# ─── docker-compose.dev.yml ── Development overrides ─────────────────────────
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml --env-file .env.docker up
+#
+# What this adds over the base compose:
+#   • postgres port exposed locally (5432) so you can inspect with any DB client
+#   • backend uses builder stage (has dev dependencies for nodemon)
+#   • backend source is volume-mounted for hot reload
+#   • Adminer (DB GUI) at http://localhost:8080
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"   # expose for local DB clients / Prisma Studio
+
+  backend:
+    build:
+      target: builder   # builder stage has devDependencies (nodemon, ts-node)
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      # Mount source for hot reload — node_modules stays in the image
+      - ./backend/src:/app/src:ro
+      - ./backend/prisma:/app/prisma:ro
+    ports:
+      - "3000:3000"
+
+  # ── Adminer — lightweight DB GUI ─────────────────────────────────────────────
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN:         pepa-linha-dark
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - internal
