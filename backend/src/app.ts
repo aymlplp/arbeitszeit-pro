@@ -25,7 +25,12 @@ app.use(cors({
       'http://localhost:3001',
       process.env.FRONTEND_URL
     ];
-    if (!origin || allowed.includes(origin) || origin.startsWith('http://localhost:')) {
+    if (
+      !origin || 
+      allowed.includes(origin) || 
+      origin.startsWith('http://localhost:') || 
+      origin.endsWith('.vercel.app')
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
