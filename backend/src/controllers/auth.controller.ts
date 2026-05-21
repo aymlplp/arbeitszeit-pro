@@ -58,15 +58,15 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         email, 
         name, 
         passwordHash, 
-        verificationCode: code, 
-        verificationCodeExpiry: expiry,
+        verificationCode: null, 
+        verificationCodeExpiry: null,
+        emailVerified: true,
         plan: (plan?.toUpperCase() === 'PRO') ? 'PRO' : 'FREE'
       },
     });
 
-    sendVerificationEmail(user.email, user.name, code).catch(() => null);
-
-    res.status(201).json({ success: true, needsVerification: true, userId: user.id });
+    const accessToken = await issueSession(res, user.id);
+    res.status(201).json({ success: true, user: formatUser(user), accessToken });
   } catch (err) {
     next(err);
   }
@@ -137,21 +137,37 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   try {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    let user = null;
+    if (email.includes('@')) {
+      user = await prisma.user.findFirst({
+        where: {
+          email: {
+            equals: email.trim(),
+            mode: 'insensitive'
+          }
+        }
+      });
+    } else {
+      user = await prisma.user.findFirst({
+        where: {
+          name: {
+            equals: email.trim(),
+            mode: 'insensitive'
+          }
+        }
+      });
+    }
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
     if (!user.emailVerified) {
-      const code   = gen6DigitCode();
-      const expiry = new Date(Date.now() + 15 * 60 * 1000);
-      await prisma.user.update({ 
-        where: { id: user.id }, 
-        data: { verificationCode: code, verificationCodeExpiry: expiry } 
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, verificationCode: null, verificationCodeExpiry: null }
       });
-      sendVerificationEmail(user.email, user.name, code).catch(() => null);
-      return res.status(403).json({ code: 'UNVERIFIED', userId: user.id });
+      user.emailVerified = true;
     }
 
     const accessToken = await issueSession(res, user.id);

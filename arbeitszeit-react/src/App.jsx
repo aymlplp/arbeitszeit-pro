@@ -44,8 +44,7 @@ export default function App() {
       return
     }
 
-    const apiUrl = import.meta.env.VITE_API_URL
-    if (!apiUrl) { setAuthChecked(true); return }
+    const apiUrl = import.meta.env.VITE_API_URL || '/api';
     authInit().then(user => {
       if (user) { setCurrentUser(user); loadFromCloud() }
       else setShowAuth(true)

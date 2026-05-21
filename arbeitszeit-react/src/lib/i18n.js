@@ -101,6 +101,12 @@ export const T = {
     proTag:        'PRO',
     bizTag:        'BIZ',
     noEntries:     'Keine Einträge für diesen Tag.',
+    password:      'Passwort',
+    emailOrUsername: 'E-Mail oder Name',
+    loginBtn:      'Anmelden →',
+    forgotPw:      'Passwort vergessen?',
+    createAcc:     'Konto erstellen',
+    welcomeBack:   'Willkommen zurück',
   },
   en: {
     appName:       'Arbeitszeit Pro',
@@ -181,6 +187,12 @@ export const T = {
     proTag:        'PRO',
     bizTag:        'BIZ',
     noEntries:     'No entries for this day.',
+    password:      'Password',
+    emailOrUsername: 'Email or Username',
+    loginBtn:      'Login →',
+    forgotPw:      'Forgot password?',
+    createAcc:     'Create account',
+    welcomeBack:   'Welcome back',
   },
   ar: {
     appName:       'Arbeitszeit Pro',
@@ -261,6 +273,12 @@ export const T = {
     proTag:        'PRO',
     bizTag:        'BIZ',
     noEntries:     'لا توجد إدخالات لهذا اليوم.',
+    password:      'كلمة المرور',
+    emailOrUsername: 'البريد الإلكتروني أو اسم المستخدم',
+    loginBtn:      'تسجيل الدخول ←',
+    forgotPw:      'هل نسيت كلمة المرور؟',
+    createAcc:     'إنشاء حساب',
+    welcomeBack:   'مرحباً بعودتك',
   },
 }
 

@@ -1,5 +1,6 @@
 # ─── Stage 1: Builder ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
@@ -15,6 +16,7 @@ RUN npm run build
 
 # ─── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
+RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /app
 
@@ -27,6 +29,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist          ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules  ./node_modules
 COPY --from=builder --chown=nodejs:nodejs /app/package.json  ./
 COPY --from=builder --chown=nodejs:nodejs /app/prisma        ./prisma
+COPY --from=builder --chown=nodejs:nodejs /app/frontend-dist ./frontend-dist
 COPY --chown=nodejs:nodejs docker-entrypoint.sh              ./
 
 RUN chmod +x docker-entrypoint.sh

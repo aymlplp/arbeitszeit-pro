@@ -31,6 +31,7 @@ export const sendWelcomeEmail = async (email: string, name?: string | null) => {
 
 export const sendVerificationEmail = async (email: string, name: string | null, code: string) => {
   try {
+    console.log(`[VERIFICATION CODE] Generated code for ${email} is: ${code}`);
     await transporter.sendMail({
       from: process.env.SMTP_FROM || '"Arbeitszeit Pro" <no-reply@arbeitszeit.app>',
       to: email,

@@ -1,6 +1,6 @@
 // src/lib/auth.js — Backend API client (JWT + Refresh rotation)
 
-const API = import.meta.env.VITE_API_URL || '/api'
+const API = import.meta.env.VITE_API_URL || '/api';
 
 let _accessToken = null
 let _refreshTimer = null

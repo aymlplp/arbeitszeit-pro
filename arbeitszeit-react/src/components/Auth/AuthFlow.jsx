@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { login, register, verifyEmail, resendCode, forgotPassword } from '@/lib/auth'
 import toast from 'react-hot-toast'
+import useAppStore from '@/store/useAppStore'
+import { useT, LANGS, LANG_NAMES } from '@/lib/i18n'
 
 const CARD = 'bg-white rounded-2xl shadow-2xl shadow-purple-900/20 p-7 w-full max-w-sm'
 const INP  = 'w-full bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-sm text-purple-900 outline-none focus:border-purple-500 focus:bg-white transition-all placeholder-purple-400/50'
@@ -10,6 +12,9 @@ const BTN  = 'w-full bg-purple-600 text-white font-bold rounded-full py-3 text-s
 const GHOST = 'w-full bg-white text-purple-700 font-semibold rounded-full py-3 text-sm border border-purple-200 hover:bg-purple-50 transition-all cursor-pointer'
 
 export default function AuthFlow({ onSuccess }) {
+  const { lang, setLang } = useAppStore()
+  const t = useT(lang)
+
   const [screen,  setScreen]  = useState('login')   // login | register | verify | forgot
   const [loading, setLoading] = useState(false)
   const [userId,  setUserId]  = useState(null)
@@ -18,6 +23,11 @@ export default function AuthFlow({ onSuccess }) {
   // Form state
   const [form, setForm] = useState({ name: '', email: '', password: '', plan: 'free' })
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const cycleLang = () => {
+    const idx = LANGS.indexOf(lang)
+    setLang(LANGS[(idx + 1) % LANGS.length])
+  }
 
   const wrap = async (fn) => {
     setLoading(true)
@@ -35,6 +45,11 @@ export default function AuthFlow({ onSuccess }) {
     if (!form.name || !form.email || !form.password) throw new Error('Alle Felder erforderlich')
     const d = await register(form.name, form.email, form.password, form.plan)
     toast.success('Konto erfolgreich erstellt!')
+    if (d?.needsVerification) {
+      setUserId(d.userId)
+      setScreen('verify')
+      return
+    }
     onSuccess(d.user)
   })
 
@@ -73,9 +88,20 @@ export default function AuthFlow({ onSuccess }) {
     transition: { duration: 0.18 },
   }
 
+  const appSub = lang === 'ar' ? 'تسجيل الوقت الاحترافي' : lang === 'en' ? 'Professional Time Tracking' : 'Professionelle Zeiterfassung'
+  const offlineBtn = lang === 'ar' ? 'استخدام بدون اتصال (بدون حساب) ←' : lang === 'en' ? 'Use offline (without account) →' : 'Offline nutzen (ohne Konto) →'
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-app-gradient"
+    <div className="min-h-screen flex items-center justify-center p-4 bg-app-gradient relative"
       style={{ background: 'linear-gradient(135deg,#e8e0f5,#d4c8f0,#c9b8e8,#e0c8e8)' }}>
+      {/* Floating Language Switcher */}
+      <div className="absolute top-4 right-4 z-50">
+        <button onClick={cycleLang}
+          className="inline-flex items-center gap-1 bg-white/80 backdrop-blur border border-purple-200 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-white transition-all cursor-pointer shadow-sm">
+          🌐 {LANG_NAMES[lang]} ▾
+        </button>
+      </div>
+
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -83,37 +109,37 @@ export default function AuthFlow({ onSuccess }) {
             ⏱
           </div>
           <div className="text-xl font-extrabold text-purple-900">Arbeitszeit Pro</div>
-          <div className="text-sm text-purple-500/70 mt-1">Professionelle Zeiterfassung</div>
+          <div className="text-sm text-purple-500/70 mt-1">{appSub}</div>
         </div>
 
         <AnimatePresence mode="wait">
           {/* ── LOGIN ── */}
           {screen === 'login' && (
             <motion.div key="login" {...ANIM} className={CARD}>
-              <div className="text-base font-bold text-purple-900 mb-5">Willkommen zurück</div>
+              <div className="text-base font-bold text-purple-900 mb-5">{t.welcomeBack}</div>
               <div className="space-y-3 mb-4">
-                <input type="email" placeholder="E-Mail" value={form.email}
+                <input type="text" placeholder={t.emailOrUsername} value={form.email}
                   onChange={e => setF('email', e.target.value)} className={INP}
                   onKeyDown={e => e.key === 'Enter' && doLogin()} />
-                <input type="password" placeholder="Passwort" value={form.password}
+                <input type="password" placeholder={t.password} value={form.password}
                   onChange={e => setF('password', e.target.value)} className={INP}
                   onKeyDown={e => e.key === 'Enter' && doLogin()} />
               </div>
               <button onClick={doLogin} disabled={loading} className={BTN}>
-                {loading ? '…' : 'Anmelden →'}
+                {loading ? '…' : t.loginBtn}
               </button>
               <div className="flex justify-between mt-4">
                 <button onClick={() => setScreen('register')} className="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
-                  Konto erstellen
+                  {t.createAcc}
                 </button>
                 <button onClick={() => setScreen('forgot')} className="text-xs text-purple-500 hover:text-purple-700 cursor-pointer">
-                  Passwort vergessen?
+                  {t.forgotPw}
                 </button>
               </div>
               <div className="mt-4 pt-4 border-t border-purple-100">
                 <button onClick={() => onSuccess(null)}
                   className="w-full text-xs text-purple-400 hover:text-purple-600 cursor-pointer">
-                  Offline nutzen (ohne Konto) →
+                  {offlineBtn}
                 </button>
               </div>
             </motion.div>
