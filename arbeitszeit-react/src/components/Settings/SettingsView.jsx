@@ -215,9 +215,14 @@ export default function SettingsView({ t, onBack }) {
                   </div>
                 </div>
                 {currentUser.plan !== 'pro' ? (
-                  <Button variant="primary" onClick={() => startCheckout('pro')} className="w-full justify-center">
-                    Auf Pro upgraden
-                  </Button>
+                  <div className="space-y-2">
+                    <Button variant="primary" onClick={() => startCheckout('pro_monthly')} className="w-full justify-center">
+                      {lang === 'ar' ? 'اشتراك شهري (2€ / شهر) ➔' : lang === 'en' ? 'Monthly Plan (2€/Mo) ➔' : 'Monatlich abonnieren (2€/Mo) ➔'}
+                    </Button>
+                    <Button variant="ghost" onClick={() => startCheckout('pro_yearly')} className="w-full justify-center border border-purple-300 bg-white hover:bg-purple-100">
+                      {lang === 'ar' ? 'اشتراك سنوي (15€ / سنة - توفير 37%) ➔' : lang === 'en' ? 'Annual Plan (15€/Yr - Save 37%) ➔' : 'Jährlich abonnieren (15€/Jahr - 37% sparen) ➔'}
+                    </Button>
+                  </div>
                 ) : (
                   <Button variant="ghost" onClick={() => openBillingPortal()} className="w-full justify-center border border-purple-200">
                     Kundenportal öffnen

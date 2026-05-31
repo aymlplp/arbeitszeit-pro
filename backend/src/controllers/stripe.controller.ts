@@ -20,12 +20,20 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response, nex
       await prisma.user.update({ where: { id: user.id }, data: { stripeCustId: customerId } });
     }
 
+    const { plan } = req.body;
+    let priceId = process.env.STRIPE_PRICE_ID;
+    if (plan === 'pro_yearly') {
+      priceId = process.env.STRIPE_PRICE_ID_YEARLY || process.env.STRIPE_PRICE_ID;
+    } else if (plan === 'pro_monthly') {
+      priceId = process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID;
+    }
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID as string, // Your pro plan price ID
+          price: priceId as string,
           quantity: 1,
         },
       ],

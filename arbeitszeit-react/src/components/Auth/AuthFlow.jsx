@@ -90,6 +90,7 @@ export default function AuthFlow({ onSuccess }) {
 
   const appSub = lang === 'ar' ? 'تسجيل الوقت الاحترافي' : lang === 'en' ? 'Professional Time Tracking' : 'Professionelle Zeiterfassung'
   const offlineBtn = lang === 'ar' ? 'استخدام بدون اتصال (بدون حساب) ←' : lang === 'en' ? 'Use offline (without account) →' : 'Offline nutzen (ohne Konto) →'
+  const proLabel = lang === 'ar' ? 'Pro (2€/شهرياً أو 15€/سنوياً)' : lang === 'en' ? 'Pro (2€/Mo or 15€/Yr)' : 'Pro (2€/Mo oder 15€/Jahr)'
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-app-gradient relative"
@@ -158,7 +159,7 @@ export default function AuthFlow({ onSuccess }) {
                 <input type="password" placeholder="Passwort (Min. 8 Zeichen, 1 Großbuchstabe, 1 Zahl)" value={form.password}
                   onChange={e => setF('password', e.target.value)} className={INP} />
                 <div className="grid grid-cols-2 gap-2">
-                  {[{ v: 'free', l: 'Free (0€)' }, { v: 'pro', l: 'Pro (4,99€/Mo)' }].map(p => (
+                  {[{ v: 'free', l: 'Free (0€)' }, { v: 'pro', l: proLabel }].map(p => (
                     <button key={p.v} onClick={() => setF('plan', p.v)}
                       className={`text-xs py-2 px-3 rounded-xl border font-semibold transition-all cursor-pointer
                         ${form.plan === p.v ? 'bg-purple-600 text-white border-transparent' : 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400'}`}>

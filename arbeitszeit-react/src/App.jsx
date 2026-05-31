@@ -133,7 +133,7 @@ export default function App() {
           <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl mb-3 text-sm text-white"
             style={{background:'linear-gradient(90deg,#5b4fcf,#7c6fd4)'}}>
             <span>⭐ {lang==='ar'?'النسخة المجانية':lang==='en'?'Free version — upgrade for all features':'Free-Version — alle Funktionen freischalten'}</span>
-            <button className="bg-white text-purple-700 font-bold text-xs rounded-full px-3 py-1 cursor-pointer hover:bg-purple-50">
+            <button onClick={() => setActiveTab('set')} className="bg-white text-purple-700 font-bold text-xs rounded-full px-3 py-1 cursor-pointer hover:bg-purple-50">
               {lang==='ar'?'ترقية إلى Pro':lang==='en'?'Upgrade →':'Pro upgraden →'}
             </button>
           </div>
