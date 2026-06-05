@@ -248,13 +248,13 @@ export default function SettingsView({ t, onBack }) {
                   newAreas[i] = typeof a === 'string' ? {name: e.target.value} : {...a, name: e.target.value};
                   setAreas(newAreas);
                 }} />
-              <input type="time" className={LI_INP + " w-24 !bg-transparent !border-0 !p-0 text-xs text-center"} value={start}
+              <input type="time" className="w-24 h-8 bg-purple-50/60 border border-purple-100/80 rounded-xl px-2 text-xs text-center text-purple-900 outline-none focus:border-purple-300 focus:bg-purple-100/80 transition-all" value={start}
                 onChange={e => {
                   const newAreas = [...areas];
                   newAreas[i] = typeof a === 'string' ? {name: a, start: e.target.value} : {...a, start: e.target.value};
                   setAreas(newAreas);
                 }} />
-              <input type="time" className={LI_INP + " w-24 !bg-transparent !border-0 !p-0 text-xs text-center"} value={end}
+              <input type="time" className="w-24 h-8 bg-purple-50/60 border border-purple-100/80 rounded-xl px-2 text-xs text-center text-purple-900 outline-none focus:border-purple-300 focus:bg-purple-100/80 transition-all" value={end}
                 onChange={e => {
                   const newAreas = [...areas];
                   newAreas[i] = typeof a === 'string' ? {name: a, end: e.target.value} : {...a, end: e.target.value};
@@ -267,9 +267,9 @@ export default function SettingsView({ t, onBack }) {
             <input className={LI_INP + " flex-1 !bg-transparent !border-0 !p-0"} value={newArea.name || (typeof newArea==='string'?newArea:'')} placeholder="Neuer Standort…"
               onChange={e => setNewArea(typeof newArea === 'string' ? {name: e.target.value} : {...newArea, name: e.target.value})}
               onKeyDown={e => e.key === 'Enter' && addArea()} />
-            <input type="time" className={LI_INP + " w-24 !bg-transparent !border-0 !p-0 text-xs text-center"} value={newArea.start || ''}
+            <input type="time" className="w-24 h-8 bg-white border border-purple-200/80 rounded-xl px-2 text-xs text-center text-purple-900 outline-none focus:border-purple-400 transition-all" value={newArea.start || ''}
               onChange={e => setNewArea(typeof newArea === 'string' ? {name: newArea, start: e.target.value} : {...newArea, start: e.target.value})} />
-            <input type="time" className={LI_INP + " w-24 !bg-transparent !border-0 !p-0 text-xs text-center"} value={newArea.end || ''}
+            <input type="time" className="w-24 h-8 bg-white border border-purple-200/80 rounded-xl px-2 text-xs text-center text-purple-900 outline-none focus:border-purple-400 transition-all" value={newArea.end || ''}
               onChange={e => setNewArea(typeof newArea === 'string' ? {name: newArea, end: e.target.value} : {...newArea, end: e.target.value})} />
             <Button variant="primary" onClick={addArea} className="!px-3 !py-2 !text-xs shrink-0">+ {t.add}</Button>
           </div>
