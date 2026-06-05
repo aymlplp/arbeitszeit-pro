@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { getYearData, saveYearData } from '@/lib/auth'
 
-const DEFAULT_AREAS = ['المكتب الرئيسي', 'موقع العميل', 'المستودع']
+const DEFAULT_AREAS = ['A']
 const DEFAULT_ACTS  = ['UR', 'Reinigung', 'Kontrolle', 'Wartung', 'Sonstiges']
 
 const DEFAULT_SETTINGS = {
