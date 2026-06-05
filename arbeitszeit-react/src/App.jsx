@@ -129,7 +129,7 @@ export default function App() {
         />
 
         {/* Upgrade bar */}
-        {currentUser?.plan==='free' && (
+        {currentUser?.plan?.toLowerCase()==='free' && (
           <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl mb-3 text-sm text-white"
             style={{background:'linear-gradient(90deg,#5b4fcf,#7c6fd4)'}}>
             <span>⭐ {lang==='ar'?'النسخة المجانية':lang==='en'?'Free version — upgrade for all features':'Free-Version — alle Funktionen freischalten'}</span>

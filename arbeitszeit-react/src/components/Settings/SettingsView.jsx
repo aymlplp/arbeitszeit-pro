@@ -96,7 +96,7 @@ export default function SettingsView({ t, onBack }) {
   const directSignUrl = `${window.location.origin}/?mobileSignTopic=${sessionTopic}`
 
   const addArea = () => {
-    if (currentUser?.plan !== 'pro' && areas.length >= 1) {
+    if (currentUser?.plan?.toLowerCase() !== 'pro' && areas.length >= 1) {
       toast.error(lang === 'ar' ? 'النسخة المجانية تدعم موقعاً واحداً فقط. يرجى الترقية للـ Pro.' : lang === 'en' ? 'Free version supports only 1 work area. Please upgrade to PRO.' : 'Die kostenlose Version unterstützt nur 1 Bereich. Bitte auf PRO upgraden.')
       return
     }
@@ -211,10 +211,10 @@ export default function SettingsView({ t, onBack }) {
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-sm font-semibold text-purple-900">Aktueller Plan</p>
-                    <p className="text-xs text-purple-600">{currentUser.plan === 'pro' ? 'Pro Version (Aktiv)' : 'Kostenlose Version'}</p>
+                    <p className="text-xs text-purple-600">{currentUser.plan?.toLowerCase() === 'pro' ? 'Pro Version (Aktiv)' : 'Kostenlose Version'}</p>
                   </div>
                 </div>
-                {currentUser.plan !== 'pro' ? (
+                {currentUser.plan?.toLowerCase() !== 'pro' ? (
                   <div className="space-y-2">
                     <Button variant="primary" onClick={() => startCheckout('pro_monthly')} className="w-full justify-center">
                       {lang === 'ar' ? 'اشتراك شهري (2€ / شهر) ➔' : lang === 'en' ? 'Monthly Plan (2€/Mo) ➔' : 'Monatlich abonnieren (2€/Mo) ➔'}
@@ -323,7 +323,7 @@ export default function SettingsView({ t, onBack }) {
           </div>
 
           <div className="mt-3 p-4 bg-purple-50 rounded-xl border border-purple-200 text-center flex flex-col items-center relative overflow-hidden">
-            {currentUser && currentUser.plan !== 'pro' ? (
+            {currentUser && currentUser.plan?.toLowerCase() !== 'pro' ? (
               <div className="absolute inset-0 bg-white/85 backdrop-blur-[1px] flex flex-col items-center justify-center z-10 p-3">
                 <span className="text-[18px] mb-0.5">👑</span>
                 <p className="text-[11px] font-bold text-purple-900 mb-2">

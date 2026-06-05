@@ -31,7 +31,7 @@ th,td{border:1px solid #bbb;padding:3px 5px;text-align:center;white-space:nowrap
 
 export default function ReportsView({ t }) {
   const { aData, lang, settings, currentUser } = useAppStore()
-  const isPro = currentUser?.plan === 'pro'
+  const isPro = currentUser?.plan?.toLowerCase() === 'pro'
   const [repType, setRepType] = useState('wk')
   const [rWO, setRWO] = useState(0)
   const [rMO, setRMO] = useState(0)

@@ -18,7 +18,12 @@ const useAppStore = create(
     (set, get) => ({
       // ── User ────────────────────────────────────────────────
       currentUser:    null,
-      setCurrentUser: (user) => set({ currentUser: user }),
+      setCurrentUser: (user) => {
+        if (user && user.plan) {
+          user.plan = user.plan.toLowerCase();
+        }
+        set({ currentUser: user });
+      },
 
       // ── Data ────────────────────────────────────────────────
       aData:    {},
@@ -74,7 +79,7 @@ const useAppStore = create(
 
       async doSave() {
         const { aData, aYear, settings, areas, acts, archivedYears, lang, currentUser } = get()
-        if (!currentUser || currentUser.plan !== 'pro') {
+        if (!currentUser || currentUser.plan?.toLowerCase() !== 'pro') {
           // Offline or Free plan: saved locally via persist middleware (localStorage)
           return
         }
