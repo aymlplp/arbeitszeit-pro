@@ -239,7 +239,7 @@ export default function ReportsView({ t }) {
   // ── 1. Wochenbericht ──────────────────────────────────────────────
   const buildWk = useCallback(() => {
     const dts=gDts(rWO), kw=getKW(dts[0])
-    const period=`KW${kw} ${fmt(dts[0])}–${fmtY(dts[6])}`
+    const period=`KW ${kw}  |  ${fmt(dts[0])}–${fmtY(dts[6])}`
     const allKeys = dts.map(d => getISODate(d))
     const html=`<div style="overflow-x:auto"><table class="rt">${wkTbl(rWO,true)}</table></div>${daySummary(allKeys)}`
     return{period,html}
