@@ -654,6 +654,15 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
 
   // Print helper
   const handlePrint = () => {
+    if (currentUser.plan?.toLowerCase() !== 'pro') {
+      toast.error(lang === 'ar' 
+        ? 'طباعة التقارير تتطلب اشتراك صاحب عمل فعال.' 
+        : lang === 'en' 
+          ? 'Printing reports requires an active Employer subscription.' 
+          : 'Das Drucken von Berichten erfordert ein aktives Arbeitgeber-Abonnement.'
+      )
+      return
+    }
     if (activeTab === 'week') {
       handlePrintWeekly()
     } else {
@@ -741,6 +750,15 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
   }
 
   const handleExportWeeklyExcel = () => {
+    if (currentUser.plan?.toLowerCase() !== 'pro') {
+      toast.error(lang === 'ar' 
+        ? 'تصدير التقارير إلى Excel يتطلب اشتراك صاحب عمل فعال.' 
+        : lang === 'en' 
+          ? 'Exporting reports to Excel requires an active Employer subscription.' 
+          : 'Das Exportieren von Berichten nach Excel erfordert ein aktives Arbeitgeber-Abonnement.'
+      )
+      return
+    }
     const { period, html } = buildWeeklyHtml(weekOffset)
     const em = selectedWorker.name || 'Worker'
     const filename = `${em}_woche_${getStartOfWeek(weekOffset).toLocaleDateString()}.xls`
@@ -748,6 +766,15 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
   }
 
   const handleExportMonthlyExcel = () => {
+    if (currentUser.plan?.toLowerCase() !== 'pro') {
+      toast.error(lang === 'ar' 
+        ? 'تصدير التقارير إلى Excel يتطلب اشتراك صاحب عمل فعال.' 
+        : lang === 'en' 
+          ? 'Exporting reports to Excel requires an active Employer subscription.' 
+          : 'Das Exportieren von Berichten nach Excel erfordert ein aktives Arbeitgeber-Abonnement.'
+      )
+      return
+    }
     const { period, html } = buildMonthlyCombinedHtml()
     const em = selectedWorker.name || 'Worker'
     const filename = `${em}_monat_${MONTHS_OF_YEAR[lang]?.[selectedMonth]}_${selectedYear}.xls`
@@ -909,18 +936,18 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
                       {years.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                   )}
-                  <Button variant="ghost" onClick={handlePrint} className="!py-1.5 !px-3 text-xs gap-1">
-                    <Printer size={13} />
+                  <Button variant="ghost" onClick={handlePrint} className={`!py-1.5 !px-3 text-xs gap-1 ${currentUser.plan?.toLowerCase() !== 'pro' ? 'opacity-85' : ''}`}>
+                    {currentUser.plan?.toLowerCase() !== 'pro' ? '🔒' : <Printer size={13} />}
                     <span>{activeTab === 'week' ? trans.printWeeklyReport : trans.printReport}</span>
                   </Button>
                   {activeTab === 'week' && (
-                    <Button variant="ghost" onClick={handleExportWeeklyExcel} className="!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
-                      <span>📊 Excel ({trans.week})</span>
+                    <Button variant="ghost" onClick={handleExportWeeklyExcel} className={`!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 ${currentUser.plan?.toLowerCase() !== 'pro' ? 'opacity-85' : ''}`}>
+                      {currentUser.plan?.toLowerCase() !== 'pro' ? '🔒' : '📊'} Excel ({trans.week})
                     </Button>
                   )}
                   {activeTab === 'month' && (
-                    <Button variant="ghost" onClick={handleExportMonthlyExcel} className="!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
-                      <span>📊 Excel ({trans.month})</span>
+                    <Button variant="ghost" onClick={handleExportMonthlyExcel} className={`!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 ${currentUser.plan?.toLowerCase() !== 'pro' ? 'opacity-85' : ''}`}>
+                      {currentUser.plan?.toLowerCase() !== 'pro' ? '🔒' : '📊'} Excel ({trans.month})
                     </Button>
                   )}
                 </div>

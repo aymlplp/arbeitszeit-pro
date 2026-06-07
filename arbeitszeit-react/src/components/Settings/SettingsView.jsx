@@ -247,10 +247,14 @@ export default function SettingsView({ t, onBack }) {
                 {currentUser.plan?.toLowerCase() !== 'pro' ? (
                   <div className="space-y-2">
                     <Button variant="primary" onClick={() => startCheckout('pro_monthly')} className="w-full justify-center">
-                      {lang === 'ar' ? 'اشتراك شهري (2€ / شهر) ➔' : lang === 'en' ? 'Monthly Plan (2€/Mo) ➔' : 'Monatlich abonnieren (2€/Mo) ➔'}
+                      {currentUser.role === 'EMPLOYER'
+                        ? (lang === 'ar' ? 'اشتراك شهري (4.99€ / شهر) ➔' : lang === 'en' ? 'Monthly Plan (4.99€/Mo) ➔' : 'Monatlich abonnieren (4.99€/Mo) ➔')
+                        : (lang === 'ar' ? 'اشتراك شهري (2€ / شهر) ➔' : lang === 'en' ? 'Monthly Plan (2€/Mo) ➔' : 'Monatlich abonnieren (2€/Mo) ➔')}
                     </Button>
                     <Button variant="ghost" onClick={() => startCheckout('pro_yearly')} className="w-full justify-center border border-purple-300 bg-white hover:bg-purple-100">
-                      {lang === 'ar' ? 'اشتراك سنوي (15€ / سنة - توفير 37%) ➔' : lang === 'en' ? 'Annual Plan (15€/Yr - Save 37%) ➔' : 'Jährlich abonnieren (15€/Jahr - 37% sparen) ➔'}
+                      {currentUser.role === 'EMPLOYER'
+                        ? (lang === 'ar' ? 'اشتراك سنوي (34.99€ / سنة - توفير 41%) ➔' : lang === 'en' ? 'Annual Plan (34.99€/Yr - Save 41%) ➔' : 'Jährlich abonnieren (34.99€/Jahr - 41% sparen) ➔')
+                        : (lang === 'ar' ? 'اشتراك سنوي (15€ / سنة - توفير 37%) ➔' : lang === 'en' ? 'Annual Plan (15€/Yr - Save 37%) ➔' : 'Jährlich abonnieren (15€/Jahr - 37% sparen) ➔')}
                     </Button>
                   </div>
                 ) : (

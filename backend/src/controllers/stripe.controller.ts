@@ -22,10 +22,19 @@ export const createCheckoutSession = async (req: AuthRequest, res: Response, nex
 
     const { plan } = req.body;
     let priceId = process.env.STRIPE_PRICE_ID;
-    if (plan === 'pro_yearly') {
-      priceId = process.env.STRIPE_PRICE_ID_YEARLY || process.env.STRIPE_PRICE_ID;
-    } else if (plan === 'pro_monthly') {
-      priceId = process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID;
+    
+    if (user.role === 'EMPLOYER') {
+      if (plan === 'pro_yearly') {
+        priceId = process.env.STRIPE_PRICE_ID_EMPLOYER_YEARLY || process.env.STRIPE_PRICE_ID_YEARLY || process.env.STRIPE_PRICE_ID;
+      } else if (plan === 'pro_monthly') {
+        priceId = process.env.STRIPE_PRICE_ID_EMPLOYER_MONTHLY || process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID;
+      }
+    } else {
+      if (plan === 'pro_yearly') {
+        priceId = process.env.STRIPE_PRICE_ID_YEARLY || process.env.STRIPE_PRICE_ID;
+      } else if (plan === 'pro_monthly') {
+        priceId = process.env.STRIPE_PRICE_ID_MONTHLY || process.env.STRIPE_PRICE_ID;
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
