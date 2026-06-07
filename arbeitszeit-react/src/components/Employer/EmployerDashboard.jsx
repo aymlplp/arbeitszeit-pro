@@ -305,9 +305,404 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     return { arb, fahr, pause, net: arb + fahr - pause, workDays, sickDays, holidays, vacation }
   }, [workerData, selectedYear, selectedMonth])
 
+  // Local date helpers inside component
+  const getCurrentMondayLocal = () => {
+    const t = new Date(); t.setHours(0,0,0,0)
+    const d = t.getDay(), diff = d===0?6:d-1
+    t.setDate(t.getDate()-diff); return t
+  }
+  const BASE_LOCAL = getCurrentMondayLocal()
+
+  const getMondayByOffsetLocal = (offset) => {
+    const d = new Date(BASE_LOCAL); d.setDate(BASE_LOCAL.getDate()+offset*7); return d
+  }
+  const getWeekDatesLocal = (offset) => {
+    const mon = getMondayByOffsetLocal(offset)
+    return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d})
+  }
+  const getKWLocal = (date) => {
+    const u = new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()))
+    u.setUTCDate(u.getUTCDate()+4-(u.getUTCDay()||7))
+    return Math.ceil((((u-new Date(Date.UTC(u.getUTCFullYear(),0,1)))/864e5)+1)/7)
+  }
+
+  const styleR1 = 'background-color: #F5A623; color: #412402; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleR2 = 'background-color: #FAD07A; color: #633806; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRg = 'background-color: #C8E6A0; color: #27500A; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRbl = 'background-color: #B5D4F4; color: #0C447C; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRo = 'background-color: #F5C4B3; color: #712B13; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRtot = 'background-color: #4CAF50; color: #ffffff; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRsk = 'background-color: #FCEBEB; color: #A32D2D; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRho = 'background-color: #E6F1FB; color: #185FA5; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleRva = 'background-color: #EAF3DE; color: #3B6D11; font-weight: bold; border: 1px solid #bbb; padding: 4px 6px; text-align: center;'
+  const styleTd = 'border: 1px solid #bbb; padding: 4px 6px; text-align: center; font-size: 10px; color: #222;'
+
+  const getDaySum = (k) => {
+    const d = workerData.data?.[k]
+    if (!d) return { arb: 0, fahr: 0, pause: 0, tot: 0, wt: 0, sk: 0, hl: 0, vc: 0 }
+    let a = 0, f = 0, p = 0
+    
+    const pT = s => {
+      if (!s||!s.trim()) return 0
+      const m=s.trim().match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/)
+      if(!m)return 0
+      let d=(+m[3]*60+ +m[4])-(+m[1]*60+ +m[2]); return(d<0?d+1440:d)/60
+    }
+    const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
+
+    ;(d.entries || []).forEach(e => {
+      const mins = (() => {
+        if (e.start && e.end) {
+          const t = parseTimeToMin(e.end) - parseTimeToMin(e.start)
+          return t > 0 ? t : 0
+        }
+        return (e.days || []).reduce((s, dd) => s + pT(dd), 0) * 60
+      })()
+      if (e.days) {
+        a += cA(e) * 60
+      } else {
+        a += mins
+      }
+      f += (parseFloat(e.fahrt) || 0) * 60
+      p += (parseFloat(e.pause) || 0) * 60
+    })
+    
+    const typ = d.type || 'work'
+    return {
+      arb: a,
+      fahr: f,
+      pause: p,
+      tot: a + f - p,
+      wt: a > 0 && typ === 'work' ? 1 : 0,
+      sk: typ === 'sick' ? 1 : 0,
+      hl: typ === 'holiday' ? 1 : 0,
+      vc: typ === 'vacation' ? 1 : 0,
+    }
+  }
+
+  const fH = (m) => {
+    if (!m || m === 0) return '0h'
+    const hh = m / 60
+    return hh === Math.floor(hh) ? Math.floor(hh) + 'h' : hh.toFixed(2) + 'h'
+  }
+
+  const wkTblHtml = (off, showHdr) => {
+    const dts  = getWeekDatesLocal(off)
+    const kw   = getKWLocal(dts[0])
+    const dn   = lang==='ar'?3:2
+
+    let tA=0, tf=0, tp2=0
+    let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
+    let rows = ''
+    
+    const formatDDMMLocal = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.`
+    const formatFullLocal = d => formatDDMMLocal(d) + d.getFullYear()
+    
+    const RCLS_INLINE = {
+      sick: styleRsk,
+      holiday: styleRho,
+      vacation: styleRva
+    }
+
+    dts.forEach((d, i) => {
+      const k = toISODate(d)
+      const dayData = workerData.data?.[k] || {}
+      const typ = dayData.type || 'work'
+
+      if (typ !== 'work') {
+        const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
+                       typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
+                       typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
+        let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
+        cells[i] = `<td style="${RCLS_INLINE[typ] || styleTd}; font-weight:bold; font-size:12px">${letter}</td>`
+        rows += `<tr>
+          <td colspan="2" style="${styleTd}"></td>
+          ${cells.join('')}
+          <td style="${styleRg}"></td>
+        </tr>`
+      } else {
+        ;(dayData.entries || []).forEach(e => {
+          let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
+          
+          const pT = s => {
+            if (!s||!s.trim()) return 0
+            const m=s.trim().match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/)
+            if(!m)return 0
+            let d=(+m[3]*60+ +m[4])-(+m[1]*60+ +m[2]); return(d<0?d+1440:d)/60
+          }
+          const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
+
+          if (e.days) {
+            cells = e.days.map((dd, idx) => {
+              const rc = (e.tg || [])[idx] ? RCLS_INLINE[(e.tg || [])[idx]] : styleTd
+              return `<td style="${rc}; font-size:10px; font-family:monospace">${dd||''}</td>`
+            })
+            tA += cA(e)*60
+          } else {
+            const range=e.start&&e.end?`${e.start}–${e.end}`:''
+            cells[i] = `<td style="${styleTd}; font-size:10px; font-family:monospace; font-weight:600">${range}</td>`
+            const mins=(()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
+            tA += mins
+            dA[i] += mins
+          }
+          
+          tf += (parseFloat(e.fahrt)||0)*60
+          dF[i] += (parseFloat(e.fahrt)||0)*60
+          
+          tp2 += (parseFloat(e.pause)||0)*60
+          dP[i] += (parseFloat(e.pause)||0)*60
+          
+          const ar = e.days ? cA(e)*60 : (()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
+          rows += `<tr>
+            <td style="${styleTd}; text-align:left; font-weight:500">${e.obj||e.area||''}</td>
+            <td style="${styleTd}">${e.taet||e.activity||''}</td>
+            ${cells.join('')}
+            <td style="${styleRg}; font-weight:500">${ar>0?fH(ar):''}</td>
+          </tr>`
+        })
+      }
+    })
+
+    const noELbl = lang === 'ar' ? 'لا إدخالات' : lang === 'en' ? 'No entries' : 'Keine Einträge'
+    if(!rows) rows=`<tr><td colspan="10" style="${styleTd}; text-align:center; color:#888; padding:5px">${noELbl}</td></tr>`
+
+    const hdrs = (DAYS_OF_WEEK[lang] || DAYS_OF_WEEK.de).map((dd,i)=>
+      `<th style="${styleR2}">${dd.slice(0,dn)}<br><span style="font-weight:400;font-size:9px">${formatDDMMLocal(dts[i])}</span></th>`
+    ).join('')
+
+    const em = selectedWorker.name || ''
+    const co = wSettings.co || ''
+    const email = selectedWorker.email || ''
+    const phone = wSettings.phone || ''
+
+    const mitLbl = lang === 'ar' ? 'الموظف' : lang === 'en' ? 'Employee' : 'Mitarbeiter'
+    const objLbl = lang === 'ar' ? 'الموقع' : lang === 'en' ? 'Site' : 'Objekt'
+    const tatLbl = lang === 'ar' ? 'النشاط' : lang === 'en' ? 'Activity' : 'Tätigkeit'
+    const gesLbl = lang === 'ar' ? 'الإجمالي' : lang === 'en' ? 'Total' : 'Gesamt'
+    const arbLbl = lang === 'ar' ? 'ساعات العمل' : lang === 'en' ? 'Work Time' : 'Arbeitszeit'
+    const fahrLbl = lang === 'ar' ? 'القيادة' : lang === 'en' ? 'Drive Time' : 'Fahrzeit'
+    const pauLbl = lang === 'ar' ? 'الاستراحة' : lang === 'en' ? 'Break' : 'Pause'
+
+    const hdr = showHdr
+      ? `<tr><th colspan="10" style="${styleR1}; text-align:left; padding:5px 7px; font-size:12px">${co}${phone ? ` &nbsp;|&nbsp; ${phone}` : ''}</th></tr>
+         <tr><th colspan="5" style="${styleR1}; text-align:left; padding:3px 7px">${mitLbl}: ${em}</th><th colspan="5" style="${styleR1}; text-align:right; padding:3px 7px; font-size:10px">${email}</th></tr>`
+      : ''
+
+    return `
+    <thead>
+      ${hdr}
+      <tr><th colspan="10" style="${styleR2}; text-align:left; padding:3px 7px">KW ${kw} | ${formatDDMMLocal(dts[0])} – ${formatFullLocal(dts[6])}</th></tr>
+      <tr>
+        <th style="${styleR2}; text-align:left">${objLbl}</th>
+        <th style="${styleR2}">${tatLbl}</th>
+        ${hdrs}
+        <th style="${styleR2}">${gesLbl}</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows}
+      <tr>
+        <td colspan="2" style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
+        ${dA.map(v => `<td style="${styleRg}">${v>0?fH(v):''}</td>`).join('')}
+        <td style="${styleRg}">${fH(tA)}</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
+        ${dF.map(v => `<td style="${styleRbl}">${v>0?fH(v):''}</td>`).join('')}
+        <td style="${styleRbl}">${fH(tf)}</td>
+      </tr>
+      <tr>
+        <td colspan="2" style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
+        ${dP.map(v => `<td style="${styleRo}">${v>0?fH(v):''}</td>`).join('')}
+        <td style="${styleRo}">${fH(tp2)}</td>
+      </tr>
+      <tr>
+        <td colspan="9" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gesLbl} KW ${kw}</td>
+        <td style="${styleRtot}">${fH(tA+tf-tp2)}</td>
+      </tr>
+    </tbody>`
+  }
+
+  const daySummaryHtml = (keys) => {
+    let wt=0, sk=0, hl=0, vc=0
+    keys.forEach(k => {
+      const s = getDaySum(k)
+      wt += s.wt; sk += s.sk; hl += s.hl; vc += s.vc
+    })
+
+    const lwLbl = lang === 'ar' ? 'أيام العمل' : lang === 'en' ? 'Work Days' : 'Arbeitstage'
+    const lsLbl = lang === 'ar' ? 'أيام المرض' : lang === 'en' ? 'Sick Days' : 'Krankheitstage'
+    const lhLbl = lang === 'ar' ? 'أيام العطل' : lang === 'en' ? 'Holidays' : 'Feiertage'
+    const lvLbl = lang === 'ar' ? 'الإجازة' : lang === 'en' ? 'Vacation' : 'Urlaub'
+
+    const styleLwVal = 'font-weight:700; font-size:15px; padding:7px; background-color:#FAD07A; color:#633806; border:1px solid #bbb; text-align:center;'
+    const styleLsVal = 'font-weight:700; font-size:15px; padding:7px; background-color:#FCEBEB; color:#A32D2D; border:1px solid #bbb; text-align:center;'
+    const styleLhVal = 'font-weight:700; font-size:15px; padding:7px; background-color:#E6F1FB; color:#185FA5; border:1px solid #bbb; text-align:center;'
+    const styleLvVal = 'font-weight:700; font-size:15px; padding:7px; background-color:#EAF3DE; color:#3B6D11; border:1px solid #bbb; text-align:center;'
+
+    return `
+    <table style="margin-top:10px; max-width:400px; border-collapse:collapse; width:100%;">
+      <thead>
+        <tr>
+          <th style="${styleR2}; width:25%">${lwLbl}</th>
+          <th style="background-color:#FCEBEB; color:#A32D2D; font-weight:600; width:25%; border:1px solid #bbb; padding:4px 6px; text-align:center;">${lsLbl}</th>
+          <th style="background-color:#E6F1FB; color:#185FA5; font-weight:600; width:25%; border:1px solid #bbb; padding:4px 6px; text-align:center;">${lhLbl}</th>
+          <th style="background-color:#EAF3DE; color:#3B6D11; font-weight:600; width:25%; border:1px solid #bbb; padding:4px 6px; text-align:center;">${lvLbl}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="${styleLwVal}">${wt}</td>
+          <td style="${styleLsVal}">${sk}</td>
+          <td style="${styleLhVal}">${hl}</td>
+          <td style="${styleLvVal}">${vc}</td>
+        </tr>
+      </tbody>
+    </table>`
+  }
+
+  const buildWeeklyHtml = (off) => {
+    const dts = getWeekDatesLocal(off)
+    const kw = getKWLocal(dts[0])
+    const formatDDMMLocal = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.`
+    const formatFullLocal = d => formatDDMMLocal(d) + d.getFullYear()
+    const period = `KW ${kw}  |  ${formatDDMMLocal(dts[0])}–${formatFullLocal(dts[6])}`
+    const allKeys = dts.map(d => toISODate(d))
+    const html = `<div style="overflow-x:auto"><table style="border-collapse:collapse; width:100%;">${wkTblHtml(off, true)}</table></div>${daySummaryHtml(allKeys)}`
+    return { period, html }
+  }
+
+  const buildMonthlyCombinedHtml = () => {
+    const base = new Date(selectedYear, selectedMonth, 1)
+    const period = `${MONTHS_OF_YEAR[lang]?.[selectedMonth]} ${selectedYear}`
+    const weeks = []
+    
+    // Find all weeks that belong to this month
+    for (let i = -60; i < 60; i++) {
+      const mm = getMondayByOffsetLocal(i)
+      if (mm.getFullYear() === selectedYear && mm.getMonth() === selectedMonth && !weeks.includes(i)) {
+        weeks.push(i)
+      }
+    }
+    weeks.sort((a, b) => a - b)
+    
+    let mA = 0, mF = 0, mP = 0
+    const allKeys = []
+    weeks.forEach(w => {
+      getWeekDatesLocal(w).forEach(d => {
+        const k = toISODate(d)
+        allKeys.push(k)
+        const s = getDaySum(k)
+        mA += s.arb; mF += s.fahr; mP += s.pause
+      })
+    })
+
+    let html = ''
+    const noELbl = lang === 'ar' ? 'لا إدخالات' : lang === 'en' ? 'No entries' : 'Keine Einträge'
+    if (!weeks.length) {
+      html = `<div style="text-align:center; padding:16px; color:#888">${noELbl}</div>`
+    } else {
+      for (let pi = 0; pi < weeks.length; pi += 2) {
+        const pair = weeks.slice(pi, pi + 2)
+        const isLast = pi + 2 >= weeks.length
+        html += `<div${isLast ? '' : ' style="page-break-after:always;"'}>`
+        pair.forEach((wo, idx) => {
+          html += `<table style="border-collapse:collapse; width:100%; margin-bottom:${idx === 0 && pair.length > 1 ? '14px' : '0'}">${wkTblHtml(wo, pi === 0 && idx === 0)}</table>`
+        })
+        html += `</div>`
+      }
+    }
+
+    const mo2Lbl = lang === 'ar' ? 'ملخص الشهر' : lang === 'en' ? 'Month Overview' : 'Monatsübersicht'
+    const gmoLbl = lang === 'ar' ? 'الإجمالي الشهري' : lang === 'en' ? 'MONTH TOTAL' : 'GESAMT MONAT'
+    const arbLbl = lang === 'ar' ? 'ساعات العمل' : lang === 'en' ? 'Work Time' : 'Arbeitszeit'
+    const fahrLbl = lang === 'ar' ? 'القيادة' : lang === 'en' ? 'Drive Time' : 'Fahrzeit'
+    const pauLbl = lang === 'ar' ? 'الاستراحة' : lang === 'en' ? 'Break' : 'Pause'
+
+    html += `
+    <table style="border-collapse:collapse; width:100%; margin-top:12px">
+      <thead>
+        <tr>
+          <th colspan="10" style="${styleR1}; text-align:left; padding:5px 7px">
+            ${mo2Lbl}: ${MONTHS_OF_YEAR[lang]?.[selectedMonth]} ${selectedYear}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="9" style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
+          <td style="${styleRg}">${fH(mA)}</td>
+        </tr>
+        <tr>
+          <td colspan="9" style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
+          <td style="${styleRbl}">${fH(mF)}</td>
+        </tr>
+        <tr>
+          <td colspan="9" style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
+          <td style="${styleRo}">${fH(mP)}</td>
+        </tr>
+        <tr>
+          <td colspan="9" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gmoLbl}</td>
+          <td style="${styleRtot}; font-size:13px">${fH(mA + mF - mP)}</td>
+        </tr>
+      </tbody>
+    </table>
+    ${daySummaryHtml(allKeys)}`
+
+    return { period, html }
+  }
+
   // Print helper
   const handlePrint = () => {
-    window.print()
+    if (activeTab === 'week') {
+      handlePrintWeekly()
+    } else {
+      handlePrintMonthly()
+    }
+  }
+
+  const handlePrintWeekly = () => {
+    const { period, html } = buildWeeklyHtml(weekOffset)
+    let sigHtml = ''
+    if (wSettings.signature) {
+      const sigLbl = lang === 'ar' ? 'توقيع العامل' : lang === 'en' ? "Worker's Signature" : 'Unterschrift Mitarbeiter'
+      sigHtml = `<div style="margin-top:30px; page-break-inside:avoid; display:flex; justify-content:flex-end;">
+        <div style="text-align:center;">
+          <img src="${wSettings.signature}" style="max-height:80px; border-bottom:1px solid #222; padding-bottom:5px;" />
+          <div style="font-size:12px; margin-top:4px;">${sigLbl}</div>
+        </div>
+      </div>`
+    }
+    const co = wSettings.co || ''
+    const w = window.open('', '_blank', 'width=1050,height=750')
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${co} – ${period}</title><style>
+      body { font-family: Arial, sans-serif; padding: 10px; background: #fff; color: #222; }
+      @media print { @page { size: A4 landscape; margin: 8mm; } }
+    </style></head><body>${html}${sigHtml}</body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 700)
+  }
+
+  const handlePrintMonthly = () => {
+    const { period, html } = buildMonthlyCombinedHtml()
+    let sigHtml = ''
+    if (wSettings.signature) {
+      const sigLbl = lang === 'ar' ? 'توقيع العامل' : lang === 'en' ? "Worker's Signature" : 'Unterschrift Mitarbeiter'
+      sigHtml = `<div style="margin-top:30px; page-break-inside:avoid; display:flex; justify-content:flex-end;">
+        <div style="text-align:center;">
+          <img src="${wSettings.signature}" style="max-height:80px; border-bottom:1px solid #222; padding-bottom:5px;" />
+          <div style="font-size:12px; margin-top:4px;">${sigLbl}</div>
+        </div>
+      </div>`
+    }
+    const co = wSettings.co || ''
+    const w = window.open('', '_blank', 'width=1050,height=750')
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${co} – ${period}</title><style>
+      body { font-family: Arial, sans-serif; padding: 10px; background: #fff; color: #222; }
+      @media print { @page { size: A4 landscape; margin: 8mm; } }
+    </style></head><body>${html}${sigHtml}</body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 700)
   }
 
   const exportHtmlTableToExcel = (tableHtml, filename) => {
@@ -329,18 +724,8 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
         </xml>
         <![endif]-->
         <meta http-equiv="content-type" content="text/plain; charset=UTF-8">
-        <style>
-          table { border-collapse: collapse; width: 100%; }
-          th { background-color: #7c3aed; color: #ffffff; font-weight: bold; border: 1px solid #6d28d9; padding: 8px; text-align: left; }
-          td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          .title { font-size: 16px; font-weight: bold; color: #4c1d95; }
-        </style>
       </head>
       <body>
-        <div class="title">${selectedWorker.name || 'Worker'} - ${activeTab === 'week' ? trans.weeklyHours : trans.monthlyReport}</div>
-        <div style="margin-bottom: 15px; font-size: 12px; color: #666;">
-          ${trans.company}: ${wSettings.co || '-'} | ${trans.email}: ${selectedWorker.email} | ${trans.hourlyRate}: ${hourlyRate > 0 ? formatEuro(hourlyRate) : '-'}
-        </div>
         ${tableHtml}
       </body>
       </html>
@@ -356,176 +741,17 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
   }
 
   const handleExportWeeklyExcel = () => {
-    let tableRows = '';
-    
-    // Header Row
-    tableRows += `
-      <tr>
-        <th>${trans.day}</th>
-        <th>${trans.area}</th>
-        <th>${trans.start}</th>
-        <th>${trans.end}</th>
-        <th>${trans.breakMin}</th>
-        <th>${trans.driveMin}</th>
-        <th>${trans.net}</th>
-      </tr>
-    `;
-    
-    // Data Rows
-    currentWeekDays.forEach((day, idx) => {
-      const iso = toISODate(day);
-      const dayRecord = workerData.data?.[iso];
-      const dayName = DAYS_OF_WEEK[lang]?.[idx] || '';
-      const dayLabel = `${dayName} (${day.getDate()}.${day.getMonth() + 1}.)`;
-
-      if (!dayRecord || (!dayRecord.entries?.length && dayRecord.type === 'work')) {
-        tableRows += `
-          <tr>
-            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
-            <td colspan="6" style="color: #94a3b8; font-style: italic;">${trans.noData}</td>
-          </tr>
-        `;
-        return;
-      }
-
-      if (dayRecord.type && dayRecord.type !== 'work') {
-        tableRows += `
-          <tr>
-            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
-            <td colspan="6" style="background-color: #fef2f2; color: #991b1b; font-weight: bold;">${dayRecord.type.toUpperCase()}</td>
-          </tr>
-        `;
-        return;
-      }
-
-      dayRecord.entries.forEach((e, eIdx) => {
-        const duration = parseTimeToMin(e.end) - parseTimeToMin(e.start);
-        const dNet = duration + (parseFloat(e.fahrt) || 0) * 60 - (parseFloat(e.pause) || 0) * 60;
-        
-        tableRows += `
-          <tr>
-            ${eIdx === 0 ? `<td rowspan="${dayRecord.entries.length}" style="font-weight: bold; color: #1e1b4b; vertical-align: top;">${dayLabel}</td>` : ''}
-            <td style="color: #0f172a;">${e.area || '-'}</td>
-            <td style="font-family: monospace;">${e.start}</td>
-            <td style="font-family: monospace;">${e.end}</td>
-            <td style="font-family: monospace;">${e.pause || 0}h</td>
-            <td style="font-family: monospace;">${e.fahrt || 0}h</td>
-            <td style="font-weight: bold; color: #7c3aed; font-family: monospace;">${formatTime(dNet)}</td>
-          </tr>
-        `;
-      });
-    });
-
-    // Stats / Summary Row
-    tableRows += `
-      <tr style="background-color: #f5f3ff; font-weight: bold;">
-        <td colspan="4" style="color: #6b21a8;">Total (Netto):</td>
-        <td style="font-family: monospace;">${formatTime(weekStats.pause)}</td>
-        <td style="font-family: monospace;">${formatTime(weekStats.fahr)}</td>
-        <td style="color: #7c3aed; font-family: monospace;">${formatTime(weekStats.net)}</td>
-      </tr>
-    `;
-
-    const html = `<table>${tableRows}</table>`;
-    const filename = `${selectedWorker.name || 'worker'}_woche_${getStartOfWeek(weekOffset).toLocaleDateString()}.xls`;
-    exportHtmlTableToExcel(html, filename);
-  }
-
-  const getMonthDays = (year, month) => {
-    const date = new Date(year, month, 1)
-    const days = []
-    while (date.getMonth() === month) {
-      days.push(new Date(date))
-      date.setDate(date.getDate() + 1)
-    }
-    return days
+    const { period, html } = buildWeeklyHtml(weekOffset)
+    const em = selectedWorker.name || 'Worker'
+    const filename = `${em}_woche_${getStartOfWeek(weekOffset).toLocaleDateString()}.xls`
+    exportHtmlTableToExcel(html, filename)
   }
 
   const handleExportMonthlyExcel = () => {
-    const monthDays = getMonthDays(selectedYear, selectedMonth);
-    let tableRows = '';
-    
-    // Header Row
-    tableRows += `
-      <tr>
-        <th>${trans.day}</th>
-        <th>${trans.area}</th>
-        <th>${trans.start}</th>
-        <th>${trans.end}</th>
-        <th>${trans.breakMin}</th>
-        <th>${trans.driveMin}</th>
-        <th>${trans.net}</th>
-      </tr>
-    `;
-    
-    // Data Rows
-    monthDays.forEach((day) => {
-      const iso = toISODate(day);
-      const dayRecord = workerData.data?.[iso];
-      const dayName = DAYS_OF_WEEK[lang]?.[day.getDay() === 0 ? 6 : day.getDay() - 1] || '';
-      const dayLabel = `${dayName} (${day.getDate()}.${day.getMonth() + 1}.)`;
-
-      if (!dayRecord || (!dayRecord.entries?.length && dayRecord.type === 'work')) {
-        tableRows += `
-          <tr>
-            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
-            <td colspan="6" style="color: #94a3b8; font-style: italic;">${trans.noData}</td>
-          </tr>
-        `;
-        return;
-      }
-
-      if (dayRecord.type && dayRecord.type !== 'work') {
-        let bgColor = '#eff6ff'; // blue (holiday)
-        let textColor = '#1e40af';
-        if (dayRecord.type === 'sick') {
-          bgColor = '#fef2f2'; // red (sick)
-          textColor = '#991b1b';
-        } else if (dayRecord.type === 'vacation') {
-          bgColor = '#e0e7ff'; // indigo (vacation)
-          textColor = '#3730a3';
-        }
-        
-        tableRows += `
-          <tr>
-            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
-            <td colspan="6" style="background-color: ${bgColor}; color: ${textColor}; font-weight: bold;">${dayRecord.type.toUpperCase()}</td>
-          </tr>
-        `;
-        return;
-      }
-
-      dayRecord.entries.forEach((e, eIdx) => {
-        const duration = parseTimeToMin(e.end) - parseTimeToMin(e.start);
-        const dNet = duration + (parseFloat(e.fahrt) || 0) * 60 - (parseFloat(e.pause) || 0) * 60;
-        
-        tableRows += `
-          <tr>
-            ${eIdx === 0 ? `<td rowspan="${dayRecord.entries.length}" style="font-weight: bold; color: #1e1b4b; vertical-align: top;">${dayLabel}</td>` : ''}
-            <td style="color: #0f172a;">${e.area || '-'}</td>
-            <td style="font-family: monospace;">${e.start}</td>
-            <td style="font-family: monospace;">${e.end}</td>
-            <td style="font-family: monospace;">${e.pause || 0}h</td>
-            <td style="font-family: monospace;">${e.fahrt || 0}h</td>
-            <td style="font-weight: bold; color: #7c3aed; font-family: monospace;">${formatTime(dNet)}</td>
-          </tr>
-        `;
-      });
-    });
-
-    // Stats / Summary Row
-    tableRows += `
-      <tr style="background-color: #f5f3ff; font-weight: bold;">
-        <td colspan="4" style="color: #6b21a8;">Total (Netto):</td>
-        <td style="font-family: monospace;">${formatTime(monthStats.pause)}</td>
-        <td style="font-family: monospace;">${formatTime(monthStats.fahr)}</td>
-        <td style="color: #7c3aed; font-family: monospace;">${formatTime(monthStats.net)}</td>
-      </tr>
-    `;
-
-    const html = `<table>${tableRows}</table>`;
-    const filename = `${selectedWorker.name || 'worker'}_monat_${MONTHS_OF_YEAR[lang][selectedMonth]}_${selectedYear}.xls`;
-    exportHtmlTableToExcel(html, filename);
+    const { period, html } = buildMonthlyCombinedHtml()
+    const em = selectedWorker.name || 'Worker'
+    const filename = `${em}_monat_${MONTHS_OF_YEAR[lang]?.[selectedMonth]}_${selectedYear}.xls`
+    exportHtmlTableToExcel(html, filename)
   }
 
   const formatEuro = (val) => {
