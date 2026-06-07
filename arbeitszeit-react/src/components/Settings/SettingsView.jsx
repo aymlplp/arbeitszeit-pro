@@ -20,6 +20,11 @@ export default function SettingsView({ t, onBack }) {
   const [isWaitingSig, setIsWaitingSig] = useState(false)
   const [employerCodeInput, setEmployerCodeInput] = useState('')
   const [linkingEmployerState, setLinkingEmployerState] = useState(false)
+  const [showSignatureModal, setShowSignatureModal] = useState(false)
+
+  const modalCanvasRef = useRef(null)
+  const modalSigCtxRef = useRef(null)
+  const modalDrawingRef = useRef(false)
 
   // EventSource for ephemeral Real-time Signature streaming
   useEffect(() => {
@@ -80,6 +85,75 @@ export default function SettingsView({ t, onBack }) {
     canvas.addEventListener('touchmove',  e => { e.preventDefault(); move(e)  }, { passive: false })
     canvas.addEventListener('touchend',   stop)
   }, [])
+
+  // Modal Signature canvas drawing logic
+  useEffect(() => {
+    if (!showSignatureModal) return;
+    
+    const timer = setTimeout(() => {
+      const canvas = modalCanvasRef.current
+      if (!canvas) return
+      
+      canvas.width = canvas.clientWidth || 450
+      canvas.height = canvas.clientHeight || 250
+      
+      const ctx = canvas.getContext('2d')
+      ctx.strokeStyle = '#1e1854'
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      modalSigCtxRef.current = ctx
+
+      const getPos = (e, c) => {
+        const r = c.getBoundingClientRect()
+        const src = e.touches ? e.touches[0] : e
+        return { x: src.clientX - r.left, y: src.clientY - r.top }
+      }
+      
+      const start = e => {
+        modalDrawingRef.current = true
+        ctx.beginPath()
+        const p = getPos(e, canvas)
+        ctx.moveTo(p.x, p.y)
+      }
+      
+      const move = e => {
+        if (!modalDrawingRef.current) return
+        const p = getPos(e, canvas)
+        ctx.lineTo(p.x, p.y)
+        ctx.stroke()
+      }
+      
+      const stop = () => {
+        modalDrawingRef.current = false
+      }
+
+      canvas.addEventListener('mousedown', start)
+      canvas.addEventListener('mousemove', move)
+      canvas.addEventListener('mouseup', stop)
+      canvas.addEventListener('mouseleave', stop)
+      
+      const touchStart = e => { e.preventDefault(); start(e) }
+      const touchMove = e => { e.preventDefault(); move(e) }
+      
+      canvas.addEventListener('touchstart', touchStart, { passive: false })
+      canvas.addEventListener('touchmove', touchMove, { passive: false })
+      canvas.addEventListener('touchend', stop)
+      
+      return () => {
+        canvas.removeEventListener('mousedown', start)
+        canvas.removeEventListener('mousemove', move)
+        canvas.removeEventListener('mouseup', stop)
+        canvas.removeEventListener('mouseleave', stop)
+        canvas.removeEventListener('touchstart', touchStart)
+        canvas.removeEventListener('touchmove', touchMove)
+        canvas.removeEventListener('touchend', stop)
+        modalSigCtxRef.current = null
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [showSignatureModal])
 
   const clearSig = () => {
     const c = canvasRef.current
@@ -456,11 +530,20 @@ export default function SettingsView({ t, onBack }) {
             <p className="text-xs text-purple-800 font-medium mb-3 mt-2">
               {lang==='ar'?'امسح رمز الـ QR بجوالك للتوقيع الفوري والمباشر:':lang==='en'?'Scan this QR code to beam your signature in real-time:':'Scannen Sie diesen QR-Code für eine sofortige Übertragung:'}
             </p>
-            <div className="bg-white p-2 rounded-xl shadow-sm inline-block relative">
+            <div 
+              onClick={() => setShowSignatureModal(true)}
+              className="bg-white p-2 rounded-xl shadow-sm inline-block relative cursor-pointer hover:scale-105 active:scale-95 transition-all duration-200 group"
+              title={lang === 'ar' ? 'اضغط للتوقيع هنا في شاشة كبيرة' : 'Click to sign here in a large view'}
+            >
               <QRCodeSVG value={directSignUrl} size={120} level="M" />
+              <div className="absolute inset-0 bg-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                <span className="bg-white/95 text-purple-950 text-[10px] font-bold px-2 py-1 rounded-full shadow-md border border-purple-100">
+                  {lang === 'ar' ? '✍️ توقيع شاشة كاملة' : lang === 'en' ? '✍️ Fullscreen Sign' : '✍️ Vollbild Signatur'}
+                </span>
+              </div>
             </div>
             <p className="text-[9px] text-purple-400 mt-2 font-medium">
-              {lang==='ar'?'يتم الإرسال لحظياً بدون تخزين سحابي':'Transferred instantly without cloud storage'}
+              {lang==='ar'?'يتم الإرسال لحظياً بدون تخزين سحابي (اضغط للتوقيع هنا بملء الشاشة)':'Transferred instantly without cloud storage (Click to sign in fullscreen)'}
             </p>
           </div>
         </div>
@@ -472,6 +555,95 @@ export default function SettingsView({ t, onBack }) {
         <Button variant="ghost" onClick={onBack} className="flex-1 justify-center">{t.back}</Button>
         <Button variant="primary" onClick={onBack} className="flex-1 justify-center">{t.save}</Button>
       </div>
+
+      {/* Fullscreen Signature Modal */}
+      {showSignatureModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-purple-950/40 backdrop-blur-md">
+          <div className="bg-white rounded-2xl shadow-2xl border border-purple-100 w-full max-w-lg overflow-hidden transform transition-all duration-300 scale-100">
+            {/* Header */}
+            <div className="bg-purple-900 text-white px-5 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <span>✍️</span>
+                {lang === 'ar' ? 'توقيع إلكتروني مريح' : lang === 'en' ? 'Comfortable Signature' : 'Bequeme Unterschrift'}
+              </h3>
+              <button 
+                onClick={() => setShowSignatureModal(false)}
+                className="text-white/80 hover:text-white text-xl font-bold cursor-pointer outline-none w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center transition-all"
+              >
+                ×
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-purple-600/80">
+                {lang === 'ar' 
+                  ? 'قم بالرسم هنا باستخدام إصبعك أو قلم الشاشة أو الماوس. المساحة واسعة ومريحة للحصول على توقيع دقيق.' 
+                  : lang === 'en' 
+                    ? 'Draw here using your finger, stylus, or mouse. The space is wide and comfortable for a precise signature.' 
+                    : 'Zeichnen Sie hier mit Ihrem Finger, Stift oder der Maus. Der Bereich ist groß und komfortabel.'}
+              </p>
+              
+              <div className="border border-purple-100 rounded-xl overflow-hidden bg-purple-50/10 relative">
+                <canvas 
+                  ref={modalCanvasRef}
+                  className="block w-full bg-white cursor-crosshair touch-none"
+                  style={{ height: 260 }} 
+                />
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="bg-purple-50 px-5 py-4 flex gap-3 justify-end border-t border-purple-100">
+              <button
+                onClick={() => {
+                  const c = modalCanvasRef.current
+                  if (c && modalSigCtxRef.current) {
+                    modalSigCtxRef.current.clearRect(0, 0, c.width, c.height)
+                  }
+                }}
+                className="px-4 py-2 text-xs font-bold text-red-600 bg-white border border-red-200 rounded-xl hover:bg-red-50 active:scale-95 transition-all cursor-pointer"
+              >
+                {lang === 'ar' ? 'مسح التوقيع' : lang === 'en' ? 'Clear' : 'Löschen'}
+              </button>
+              
+              <button
+                onClick={() => setShowSignatureModal(false)}
+                className="px-4 py-2 text-xs font-semibold text-purple-600 bg-white border border-purple-200 rounded-xl hover:bg-purple-100 active:scale-95 transition-all cursor-pointer"
+              >
+                {lang === 'ar' ? 'إلغاء' : lang === 'en' ? 'Cancel' : 'Abbrechen'}
+              </button>
+              
+              <button
+                onClick={() => {
+                  const c = modalCanvasRef.current
+                  if (c) {
+                    const dataUrl = c.toDataURL('image/png')
+                    updateSettings({ signature: dataUrl })
+                    
+                    const smallCanvas = canvasRef.current
+                    if (smallCanvas && sigCtxRef.current) {
+                      const smallCtx = sigCtxRef.current
+                      smallCtx.clearRect(0, 0, smallCanvas.width, smallCanvas.height)
+                      const img = new Image()
+                      img.onload = () => {
+                        smallCtx.drawImage(img, 0, 0, smallCanvas.width, smallCanvas.height)
+                      }
+                      img.src = dataUrl
+                    }
+                    
+                    toast.success(lang === 'ar' ? '✓ تم حفظ التوقيع!' : lang === 'en' ? '✓ Signature saved!' : '✓ Unterschrift gespeichert!')
+                    setShowSignatureModal(false)
+                  }
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-purple-600 rounded-xl hover:bg-purple-700 active:scale-95 transition-all cursor-pointer shadow-md shadow-purple-500/20"
+              >
+                {lang === 'ar' ? 'حفظ وإغلاق' : lang === 'en' ? 'Save & Close' : 'Speichern & Schließen'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
