@@ -196,14 +196,38 @@ export default function EntryTable({ t, isoKey, dayData }) {
                 )}
               </div>
 
-              {/* Pause in hours */}
+              {/* Pause in hours with custom stepper */}
               <div className="col-span-2 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
                 <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase text-center truncate">{t._lang==='ar'?'استراحة':t._lang==='en'?'Break':'Pause'}</span>
-                <input type="number" min="0" max="12" step="0.5"
-                  value={e.pause??0}
-                  onChange={ev=>updateEntry(i,'pause',ev.target.value)}
-                  className={INP}
-                  title={pauseH>0 ? hoursToHHMM(pauseH) : ''}/>
+                <div className="w-full flex items-center bg-purple-50/60 border border-purple-100 rounded-lg overflow-hidden h-[28px] sm:h-[32px] focus-within:border-purple-400 focus-within:bg-white transition-all">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(e.pause) || 0;
+                      const next = Math.max(0, cur - 0.5);
+                      updateEntry(i, 'pause', next);
+                    }}
+                    className="w-5 h-full bg-purple-100/30 hover:bg-purple-200/50 flex items-center justify-center text-xs font-black text-purple-600 border-r border-purple-100 select-none active:scale-90 transition-transform cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <input type="number" min="0" max="12" step="0.5"
+                    value={e.pause??0}
+                    onChange={ev=>updateEntry(i,'pause',ev.target.value)}
+                    className="w-full bg-transparent border-0 text-[10px] sm:text-xs text-center text-purple-900 outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    title={pauseH>0 ? hoursToHHMM(pauseH) : ''}/>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(e.pause) || 0;
+                      const next = Math.min(12, cur + 0.5);
+                      updateEntry(i, 'pause', next);
+                    }}
+                    className="w-5 h-full bg-purple-100/30 hover:bg-purple-200/50 flex items-center justify-center text-xs font-black text-purple-600 border-l border-purple-100 select-none active:scale-90 transition-transform cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
                 {pauseH>0 && (
                   <div className="absolute bottom-0 left-0 right-0 text-center text-[8.5px] font-semibold text-orange-500">
                     {hoursToHHMM(pauseH)}
@@ -211,14 +235,38 @@ export default function EntryTable({ t, isoKey, dayData }) {
                 )}
               </div>
 
-              {/* Fahrt in hours */}
+              {/* Fahrt in hours with custom stepper */}
               <div className="col-span-2 sm:col-auto flex flex-col gap-0.5 relative pb-3 sm:pb-3">
                 <span className="text-[8px] font-extrabold tracking-wider text-purple-400/80 sm:hidden uppercase text-center truncate">{t._lang==='ar'?'قيادة':t._lang==='en'?'Drive':'Fahrt'}</span>
-                <input type="number" min="0" max="12" step="0.5"
-                  value={e.fahrt??0}
-                  onChange={ev=>updateEntry(i,'fahrt',ev.target.value)}
-                  className={INP}
-                  title={fahrtH>0 ? hoursToHHMM(fahrtH) : ''}/>
+                <div className="w-full flex items-center bg-purple-50/60 border border-purple-100 rounded-lg overflow-hidden h-[28px] sm:h-[32px] focus-within:border-purple-400 focus-within:bg-white transition-all">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(e.fahrt) || 0;
+                      const next = Math.max(0, cur - 0.5);
+                      updateEntry(i, 'fahrt', next);
+                    }}
+                    className="w-5 h-full bg-purple-100/30 hover:bg-purple-200/50 flex items-center justify-center text-xs font-black text-purple-600 border-r border-purple-100 select-none active:scale-90 transition-transform cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <input type="number" min="0" max="12" step="0.5"
+                    value={e.fahrt??0}
+                    onChange={ev=>updateEntry(i,'fahrt',ev.target.value)}
+                    className="w-full bg-transparent border-0 text-[10px] sm:text-xs text-center text-purple-900 outline-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    title={fahrtH>0 ? hoursToHHMM(fahrtH) : ''}/>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const cur = parseFloat(e.fahrt) || 0;
+                      const next = Math.min(12, cur + 0.5);
+                      updateEntry(i, 'fahrt', next);
+                    }}
+                    className="w-5 h-full bg-purple-100/30 hover:bg-purple-200/50 flex items-center justify-center text-xs font-black text-purple-600 border-l border-purple-100 select-none active:scale-90 transition-transform cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
                 {fahrtH>0 && (
                   <div className="absolute bottom-0 left-0 right-0 text-center text-[8.5px] font-semibold text-blue-500">
                     {hoursToHHMM(fahrtH)}
