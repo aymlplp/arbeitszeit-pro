@@ -310,6 +310,224 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     window.print()
   }
 
+  const exportHtmlTableToExcel = (tableHtml, filename) => {
+    const template = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Sheet1</x:Name>
+                <x:WorksheetOptions>
+                  <x:DisplayGridlines/>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <meta http-equiv="content-type" content="text/plain; charset=UTF-8">
+        <style>
+          table { border-collapse: collapse; width: 100%; }
+          th { background-color: #7c3aed; color: #ffffff; font-weight: bold; border: 1px solid #6d28d9; padding: 8px; text-align: left; }
+          td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          .title { font-size: 16px; font-weight: bold; color: #4c1d95; }
+        </style>
+      </head>
+      <body>
+        <div class="title">${selectedWorker.name || 'Worker'} - ${activeTab === 'week' ? trans.weeklyHours : trans.monthlyReport}</div>
+        <div style="margin-bottom: 15px; font-size: 12px; color: #666;">
+          ${trans.company}: ${wSettings.co || '-'} | ${trans.email}: ${selectedWorker.email} | ${trans.hourlyRate}: ${hourlyRate > 0 ? formatEuro(hourlyRate) : '-'}
+        </div>
+        ${tableHtml}
+      </body>
+      </html>
+    `;
+    const blob = new Blob([template], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  const handleExportWeeklyExcel = () => {
+    let tableRows = '';
+    
+    // Header Row
+    tableRows += `
+      <tr>
+        <th>${trans.day}</th>
+        <th>${trans.area}</th>
+        <th>${trans.start}</th>
+        <th>${trans.end}</th>
+        <th>${trans.breakMin}</th>
+        <th>${trans.driveMin}</th>
+        <th>${trans.net}</th>
+      </tr>
+    `;
+    
+    // Data Rows
+    currentWeekDays.forEach((day, idx) => {
+      const iso = toISODate(day);
+      const dayRecord = workerData.data?.[iso];
+      const dayName = DAYS_OF_WEEK[lang]?.[idx] || '';
+      const dayLabel = `${dayName} (${day.getDate()}.${day.getMonth() + 1}.)`;
+
+      if (!dayRecord || (!dayRecord.entries?.length && dayRecord.type === 'work')) {
+        tableRows += `
+          <tr>
+            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
+            <td colspan="6" style="color: #94a3b8; font-style: italic;">${trans.noData}</td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (dayRecord.type && dayRecord.type !== 'work') {
+        tableRows += `
+          <tr>
+            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
+            <td colspan="6" style="background-color: #fef2f2; color: #991b1b; font-weight: bold;">${dayRecord.type.toUpperCase()}</td>
+          </tr>
+        `;
+        return;
+      }
+
+      dayRecord.entries.forEach((e, eIdx) => {
+        const duration = parseTimeToMin(e.end) - parseTimeToMin(e.start);
+        const dNet = duration + (parseFloat(e.fahrt) || 0) * 60 - (parseFloat(e.pause) || 0) * 60;
+        
+        tableRows += `
+          <tr>
+            ${eIdx === 0 ? `<td rowspan="${dayRecord.entries.length}" style="font-weight: bold; color: #1e1b4b; vertical-align: top;">${dayLabel}</td>` : ''}
+            <td style="color: #0f172a;">${e.area || '-'}</td>
+            <td style="font-family: monospace;">${e.start}</td>
+            <td style="font-family: monospace;">${e.end}</td>
+            <td style="font-family: monospace;">${e.pause || 0}h</td>
+            <td style="font-family: monospace;">${e.fahrt || 0}h</td>
+            <td style="font-weight: bold; color: #7c3aed; font-family: monospace;">${formatTime(dNet)}</td>
+          </tr>
+        `;
+      });
+    });
+
+    // Stats / Summary Row
+    tableRows += `
+      <tr style="background-color: #f5f3ff; font-weight: bold;">
+        <td colspan="4" style="color: #6b21a8;">Total (Netto):</td>
+        <td style="font-family: monospace;">${formatTime(weekStats.pause)}</td>
+        <td style="font-family: monospace;">${formatTime(weekStats.fahr)}</td>
+        <td style="color: #7c3aed; font-family: monospace;">${formatTime(weekStats.net)}</td>
+      </tr>
+    `;
+
+    const html = `<table>${tableRows}</table>`;
+    const filename = `${selectedWorker.name || 'worker'}_woche_${getStartOfWeek(weekOffset).toLocaleDateString()}.xls`;
+    exportHtmlTableToExcel(html, filename);
+  }
+
+  const getMonthDays = (year, month) => {
+    const date = new Date(year, month, 1)
+    const days = []
+    while (date.getMonth() === month) {
+      days.push(new Date(date))
+      date.setDate(date.getDate() + 1)
+    }
+    return days
+  }
+
+  const handleExportMonthlyExcel = () => {
+    const monthDays = getMonthDays(selectedYear, selectedMonth);
+    let tableRows = '';
+    
+    // Header Row
+    tableRows += `
+      <tr>
+        <th>${trans.day}</th>
+        <th>${trans.area}</th>
+        <th>${trans.start}</th>
+        <th>${trans.end}</th>
+        <th>${trans.breakMin}</th>
+        <th>${trans.driveMin}</th>
+        <th>${trans.net}</th>
+      </tr>
+    `;
+    
+    // Data Rows
+    monthDays.forEach((day) => {
+      const iso = toISODate(day);
+      const dayRecord = workerData.data?.[iso];
+      const dayName = DAYS_OF_WEEK[lang]?.[day.getDay() === 0 ? 6 : day.getDay() - 1] || '';
+      const dayLabel = `${dayName} (${day.getDate()}.${day.getMonth() + 1}.)`;
+
+      if (!dayRecord || (!dayRecord.entries?.length && dayRecord.type === 'work')) {
+        tableRows += `
+          <tr>
+            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
+            <td colspan="6" style="color: #94a3b8; font-style: italic;">${trans.noData}</td>
+          </tr>
+        `;
+        return;
+      }
+
+      if (dayRecord.type && dayRecord.type !== 'work') {
+        let bgColor = '#eff6ff'; // blue (holiday)
+        let textColor = '#1e40af';
+        if (dayRecord.type === 'sick') {
+          bgColor = '#fef2f2'; // red (sick)
+          textColor = '#991b1b';
+        } else if (dayRecord.type === 'vacation') {
+          bgColor = '#e0e7ff'; // indigo (vacation)
+          textColor = '#3730a3';
+        }
+        
+        tableRows += `
+          <tr>
+            <td style="font-weight: bold; color: #1e1b4b;">${dayLabel}</td>
+            <td colspan="6" style="background-color: ${bgColor}; color: ${textColor}; font-weight: bold;">${dayRecord.type.toUpperCase()}</td>
+          </tr>
+        `;
+        return;
+      }
+
+      dayRecord.entries.forEach((e, eIdx) => {
+        const duration = parseTimeToMin(e.end) - parseTimeToMin(e.start);
+        const dNet = duration + (parseFloat(e.fahrt) || 0) * 60 - (parseFloat(e.pause) || 0) * 60;
+        
+        tableRows += `
+          <tr>
+            ${eIdx === 0 ? `<td rowspan="${dayRecord.entries.length}" style="font-weight: bold; color: #1e1b4b; vertical-align: top;">${dayLabel}</td>` : ''}
+            <td style="color: #0f172a;">${e.area || '-'}</td>
+            <td style="font-family: monospace;">${e.start}</td>
+            <td style="font-family: monospace;">${e.end}</td>
+            <td style="font-family: monospace;">${e.pause || 0}h</td>
+            <td style="font-family: monospace;">${e.fahrt || 0}h</td>
+            <td style="font-weight: bold; color: #7c3aed; font-family: monospace;">${formatTime(dNet)}</td>
+          </tr>
+        `;
+      });
+    });
+
+    // Stats / Summary Row
+    tableRows += `
+      <tr style="background-color: #f5f3ff; font-weight: bold;">
+        <td colspan="4" style="color: #6b21a8;">Total (Netto):</td>
+        <td style="font-family: monospace;">${formatTime(monthStats.pause)}</td>
+        <td style="font-family: monospace;">${formatTime(monthStats.fahr)}</td>
+        <td style="color: #7c3aed; font-family: monospace;">${formatTime(monthStats.net)}</td>
+      </tr>
+    `;
+
+    const html = `<table>${tableRows}</table>`;
+    const filename = `${selectedWorker.name || 'worker'}_monat_${MONTHS_OF_YEAR[lang][selectedMonth]}_${selectedYear}.xls`;
+    exportHtmlTableToExcel(html, filename);
+  }
+
   const formatEuro = (val) => {
     return val.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' })
   }
@@ -455,7 +673,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {years.length > 1 && (
                     <select
                       value={selectedYear}
@@ -467,8 +685,18 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
                   )}
                   <Button variant="ghost" onClick={handlePrint} className="!py-1.5 !px-3 text-xs gap-1">
                     <Printer size={13} />
-                    <span>{trans.printReport}</span>
+                    <span>{activeTab === 'week' ? trans.printWeeklyReport : trans.printReport}</span>
                   </Button>
+                  {activeTab === 'week' && (
+                    <Button variant="ghost" onClick={handleExportWeeklyExcel} className="!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
+                      <span>📊 Excel ({trans.week})</span>
+                    </Button>
+                  )}
+                  {activeTab === 'month' && (
+                    <Button variant="ghost" onClick={handleExportMonthlyExcel} className="!py-1.5 !px-3 text-xs gap-1 border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
+                      <span>📊 Excel ({trans.month})</span>
+                    </Button>
+                  )}
                 </div>
               </section>
 
