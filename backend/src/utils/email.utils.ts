@@ -76,3 +76,29 @@ export const sendPasswordResetEmail = async (email: string, name: string | null,
     console.error(`Failed to send password reset email to ${email}`, error);
   }
 };
+
+export const sendSupportEmail = async (senderName: string, senderEmail: string, senderPhone: string, message: string) => {
+  try {
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || '"Arbeitszeit Pro Support" <no-reply@arbeitszeitpro.org>',
+      to: 'm.aymlplp@gmail.com',
+      subject: 'Support-Anfrage — Arbeitszeit Pro',
+      html: `
+        <div style="font-family: sans-serif; padding: 20px; color: #333; line-height: 1.5;">
+          <h2 style="color: #4f46e5; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px;">Neue Support-Anfrage</h2>
+          <p><strong>Name:</strong> ${senderName}</p>
+          <p><strong>E-Mail:</strong> ${senderEmail}</p>
+          <p><strong>Telefon:</strong> ${senderPhone}</p>
+          <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-top: 15px;">
+            <p><strong>Beschreibung des Problems:</strong></p>
+            <p style="white-space: pre-wrap; margin: 0;">${message}</p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`Support email sent to m.aymlplp@gmail.com`);
+  } catch (error) {
+    console.error(`Failed to send support email`, error);
+    throw error;
+  }
+};

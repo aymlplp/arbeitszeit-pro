@@ -7,7 +7,8 @@ import { generateTokens } from '../utils/token.utils';
 import { 
   sendWelcomeEmail, 
   sendVerificationEmail, 
-  sendPasswordResetEmail 
+  sendPasswordResetEmail,
+  sendSupportEmail
 } from '../utils/email.utils';
 
 // Stateful session configuration with production cross-domain support
@@ -309,6 +310,23 @@ export const changePassword = async (req: any, res: Response, next: NextFunction
     });
 
     res.status(200).json({ success: true, message: 'Password changed. Please log in again.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── CUSTOMER SUPPORT EMAIL ───────────────────────────────────────────────────
+export const support = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, email, phone, message } = req.body;
+
+    if (!name || !email || !message) {
+      return res.status(400).json({ error: 'Name, Email and Message are required fields.' });
+    }
+
+    await sendSupportEmail(name, email, phone || 'Not provided', message);
+
+    res.status(200).json({ success: true, message: 'Your support request has been sent successfully.' });
   } catch (err) {
     next(err);
   }

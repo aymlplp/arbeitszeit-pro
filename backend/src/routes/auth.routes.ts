@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { 
   register, login, logout, refresh, me,
-  verifyEmail, resendCode, forgotPassword, resetPassword, changePassword 
+  verifyEmail, resendCode, forgotPassword, resetPassword, changePassword,
+  support
 } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -21,5 +22,6 @@ router.post('/resend-code', resendCode);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/change-password', authenticate, changePassword);
+router.post('/support', support);
 
 export default router;

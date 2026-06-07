@@ -185,3 +185,10 @@ export async function openBillingPortal() {
   if (!res.ok) throw new Error(data.error)
   window.location.href = data.url
 }
+
+export async function sendSupportRequest(name, email, phone, message) {
+  const res  = await request('POST', '/auth/support', { name, email, phone, message }, false)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data
+}

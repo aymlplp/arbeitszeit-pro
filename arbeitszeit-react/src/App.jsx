@@ -1,8 +1,9 @@
 // src/App.jsx
 import { useEffect, useState } from 'react'
-import { Toaster } from 'react-hot-toast'
+import { Toaster, toast } from 'react-hot-toast'
 import { AnimatePresence, motion } from 'framer-motion'
-import { authInit, logout } from '@/lib/auth'
+import { authInit, logout, sendSupportRequest } from '@/lib/auth'
+import { Modal, Input, Button } from '@/components/UI'
 import useAppStore from '@/store/useAppStore'
 import { T, useT } from '@/lib/i18n'
 import Header       from '@/components/Header'
@@ -23,6 +24,38 @@ export default function App() {
   const t = useT(lang)
   const [authChecked, setAuthChecked] = useState(false)
   const [showAuth,    setShowAuth]    = useState(false)
+  const [showSupport, setShowSupport] = useState(false)
+  const [supportForm, setSupportForm] = useState({ name: '', email: '', phone: '', message: '' })
+  const [sendingSupport, setSendingSupport] = useState(false)
+
+  useEffect(() => {
+    if (currentUser) {
+      setSupportForm(prev => ({
+        ...prev,
+        name: currentUser.name || prev.name,
+        email: currentUser.email || prev.email,
+      }));
+    }
+  }, [currentUser]);
+
+  const handleSendSupport = async (e) => {
+    e.preventDefault();
+    if (!supportForm.name.trim() || !supportForm.email.trim() || !supportForm.message.trim()) {
+      toast.error(lang === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة.' : 'Please fill all required fields.');
+      return;
+    }
+    try {
+      setSendingSupport(true);
+      await sendSupportRequest(supportForm.name, supportForm.email, supportForm.phone, supportForm.message);
+      toast.success(lang === 'ar' ? 'تم إرسال رسالتك بنجاح!' : 'Your message has been sent successfully!');
+      setSupportForm(prev => ({ ...prev, message: '' }));
+      setShowSupport(false);
+    } catch (err) {
+      toast.error(err.message || (lang === 'ar' ? 'فشل إرسال الرسالة.' : 'Failed to send message.'));
+    } finally {
+      setSendingSupport(false);
+    }
+  };
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -201,6 +234,60 @@ export default function App() {
         success:{iconTheme:{primary:'#a5d6a7',secondary:'#1e1854'}},
         error:  {iconTheme:{primary:'#ef9a9a',secondary:'#1e1854'}},
       }}/>
+
+      {/* Floating Support Button */}
+      <button onClick={() => setShowSupport(true)}
+        className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[90] flex items-center justify-center w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-800 text-white shadow-xl shadow-purple-600/30 cursor-pointer transition-all hover:scale-105 active:scale-95"
+        title={lang === 'ar' ? 'الدعم الفني' : lang === 'en' ? 'Support' : 'Support'}>
+        <span className="text-xl">💬</span>
+      </button>
+
+      {/* Support Modal */}
+      <Modal open={showSupport} onClose={() => setShowSupport(false)} 
+        title={lang === 'ar' ? 'تواصل مع الدعم الفني' : lang === 'en' ? 'Contact Support' : 'Support kontaktieren'}>
+        <form onSubmit={handleSendSupport} className="space-y-4">
+          <Input 
+            label={lang === 'ar' ? 'الاسم (مطلوب)' : lang === 'en' ? 'Name (Required)' : 'Name (Pflichtfeld)'}
+            value={supportForm.name}
+            onChange={e => setSupportForm(prev => ({ ...prev, name: e.target.value }))}
+            required
+          />
+          <Input 
+            label={lang === 'ar' ? 'البريد الإلكتروني (مطلوب)' : lang === 'en' ? 'Email (Required)' : 'E-Mail (Pflichtfeld)'}
+            type="email"
+            value={supportForm.email}
+            onChange={e => setSupportForm(prev => ({ ...prev, email: e.target.value }))}
+            required
+          />
+          <Input 
+            label={lang === 'ar' ? 'رقم الهاتف (اختياري)' : lang === 'en' ? 'Phone Number (Optional)' : 'Telefonnummer (Optional)'}
+            type="tel"
+            value={supportForm.phone}
+            onChange={e => setSupportForm(prev => ({ ...prev, phone: e.target.value }))}
+          />
+          <div>
+            <label className="block text-xs font-semibold text-purple-600/70 mb-1">
+              {lang === 'ar' ? 'شرح المشكلة (مطلوب)' : lang === 'en' ? 'Problem Description (Required)' : 'Problembeschreibung (Pflichtfeld)'}
+            </label>
+            <textarea
+              className="w-full bg-white/60 border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 outline-none transition-all focus:border-purple-500 focus:bg-white/90 placeholder-purple-400/40"
+              rows={4}
+              value={supportForm.message}
+              onChange={e => setSupportForm(prev => ({ ...prev, message: e.target.value }))}
+              placeholder={lang === 'ar' ? 'اكتب هنا...' : lang === 'en' ? 'Type here...' : 'Hier schreiben...'}
+              required
+            />
+          </div>
+          <div className="flex gap-2 justify-end pt-2">
+            <Button variant="ghost" onClick={() => setShowSupport(false)}>
+              {lang === 'ar' ? 'إلغاء' : lang === 'en' ? 'Cancel' : 'Abbrechen'}
+            </Button>
+            <Button type="submit" variant="primary" disabled={sendingSupport}>
+              {sendingSupport ? '...' : (lang === 'ar' ? 'إرسال' : lang === 'en' ? 'Send' : 'Senden')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
