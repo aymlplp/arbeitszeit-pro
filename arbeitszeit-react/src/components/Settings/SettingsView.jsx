@@ -84,6 +84,7 @@ export default function SettingsView({ t, onBack }) {
   const clearSig = () => {
     const c = canvasRef.current
     if (c && sigCtxRef.current) sigCtxRef.current.clearRect(0, 0, c.width, c.height)
+    updateSettings({ signature: '' })
   }
 
   const saveLocalSig = () => {
