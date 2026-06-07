@@ -14,6 +14,7 @@ import SettingsView from '@/components/Settings/SettingsView'
 import ArchiveView  from '@/components/Archive/ArchiveView'
 import AuthFlow     from '@/components/Auth/AuthFlow'
 import MobileSignView from '@/components/Settings/MobileSignView'
+import EmployerDashboard from '@/components/Employer/EmployerDashboard'
 import { getAccessToken, setAuthToken } from '@/lib/auth'
 import { CalendarDays, FileSpreadsheet, Coins, Settings as LucideSettings } from 'lucide-react'
 
@@ -118,6 +119,13 @@ export default function App() {
   if (showAuth) return (
     <>
       <AuthFlow onSuccess={handleAuthSuccess}/>
+      <Toaster position="bottom-center" toastOptions={{style:{borderRadius:'20px'}}}/>
+    </>
+  )
+
+  if (currentUser && currentUser.role === 'EMPLOYER') return (
+    <>
+      <EmployerDashboard currentUser={currentUser} onLogout={handleLogout} lang={lang} />
       <Toaster position="bottom-center" toastOptions={{style:{borderRadius:'20px'}}}/>
     </>
   )

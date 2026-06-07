@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { 
   register, login, logout, refresh, me,
   verifyEmail, resendCode, forgotPassword, resetPassword, changePassword,
-  support
+  support, linkEmployer, unlinkEmployer
 } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
@@ -23,5 +23,9 @@ router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 router.post('/change-password', authenticate, changePassword);
 router.post('/support', support);
+
+// Employer linking
+router.post('/link-employer', authenticate, linkEmployer);
+router.post('/unlink-employer', authenticate, unlinkEmployer);
 
 export default router;

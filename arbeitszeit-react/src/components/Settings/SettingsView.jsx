@@ -2,12 +2,12 @@
 import { useEffect, useRef, useState } from 'react'
 import useAppStore from '@/store/useAppStore'
 import { Button, SectionHeader, Divider } from '@/components/UI'
-import { changePassword, startCheckout, openBillingPortal, getAccessToken } from '@/lib/auth'
+import { changePassword, startCheckout, openBillingPortal, getAccessToken, linkEmployer, unlinkEmployer } from '@/lib/auth'
 import { QRCodeSVG } from 'qrcode.react'
 import toast from 'react-hot-toast'
 
 export default function SettingsView({ t, onBack }) {
-  const { settings, updateSettings, areas, setAreas, acts, setActs, currentUser, lang } = useAppStore()
+  const { settings, updateSettings, areas, setAreas, acts, setActs, currentUser, lang, setCurrentUser } = useAppStore()
   const [activeSubTab, setActiveSubTab] = useState('personal')
   const canvasRef = useRef(null)
   const sigCtxRef = useRef(null)
@@ -18,6 +18,8 @@ export default function SettingsView({ t, onBack }) {
   const [saving, setSaving] = useState(false)
   const [sessionTopic] = useState(() => 'azp_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10))
   const [isWaitingSig, setIsWaitingSig] = useState(false)
+  const [employerCodeInput, setEmployerCodeInput] = useState('')
+  const [linkingEmployerState, setLinkingEmployerState] = useState(false)
 
   // EventSource for ephemeral Real-time Signature streaming
   useEffect(() => {
@@ -129,6 +131,34 @@ export default function SettingsView({ t, onBack }) {
     }
   }
 
+  const handleLinkEmployer = async () => {
+    if (!employerCodeInput.trim()) return
+    setLinkingEmployerState(true)
+    try {
+      const res = await linkEmployer(employerCodeInput)
+      setCurrentUser(res.user)
+      toast.success(lang === 'ar' ? 'تم ربط الحساب بنجاح!' : 'Employer linked successfully!')
+      setEmployerCodeInput('')
+    } catch (err) {
+      toast.error(err.message || (lang === 'ar' ? 'فشل ربط الحساب' : 'Failed to link employer'))
+    } finally {
+      setLinkingEmployerState(false)
+    }
+  }
+
+  const handleUnlinkEmployer = async () => {
+    setLinkingEmployerState(true)
+    try {
+      const res = await unlinkEmployer()
+      setCurrentUser(res.user)
+      toast.success(lang === 'ar' ? 'تم إلغاء ربط الحساب' : 'Employer unlinked successfully!')
+    } catch (err) {
+      toast.error(err.message || (lang === 'ar' ? 'فشل إلغاء ربط الحساب' : 'Failed to unlink employer'))
+    } finally {
+      setLinkingEmployerState(false)
+    }
+  }
+
   const LI_CLS = 'flex items-center gap-2 mb-2'
   const LI_INP = 'flex-1 bg-white border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 outline-none focus:border-purple-500'
   const LI_DEL = 'w-8 h-8 rounded-lg bg-red-50 border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-100 transition-all cursor-pointer shrink-0 text-sm'
@@ -229,6 +259,70 @@ export default function SettingsView({ t, onBack }) {
                   </Button>
                 )}
               </div>
+
+              {/* Employer Connection Section */}
+              {currentUser.role === 'USER' && (
+                <>
+                  <Divider />
+                  <SectionHeader>{lang === 'ar' ? 'ربط صاحب العمل' : lang === 'en' ? 'Employer Connection' : 'Arbeitgeber-Verbindung'}</SectionHeader>
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col gap-3">
+                    {currentUser.employerId ? (
+                      <div>
+                        <p className="text-sm font-semibold text-purple-900">
+                          {lang === 'ar' ? 'تم الربط مع صاحب العمل' : lang === 'en' ? 'Linked with Employer' : 'Verbunden mit Arbeitgeber'}
+                        </p>
+                        <p className="text-xs text-purple-600 mb-3">
+                          {lang === 'ar' ? 'صاحب العمل يمكنه الاطلاع على ساعات عملك وطباعتها.' : lang === 'en' ? 'Your employer can view and print your tracked hours.' : 'Ihr Arbeitgeber kann Ihre aufgezeichneten Stunden einsehen und drucken.'}
+                        </p>
+                        <Button variant="danger" onClick={handleUnlinkEmployer} disabled={linkingEmployerState} className="w-full justify-center">
+                          {linkingEmployerState ? '…' : (lang === 'ar' ? 'إلغاء الربط' : lang === 'en' ? 'Disconnect' : 'Verbindung trennen')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs text-purple-600 mb-2">
+                          {lang === 'ar' ? 'أدخل رمز صاحب العمل الخاص بك لربط الحساب ومشاركة الساعات معه.' : lang === 'en' ? 'Enter your employer\'s code to link accounts and share tracked hours.' : 'Geben Sie den Code Ihres Arbeitgebers ein, um Konten zu verknüpfen.'}
+                        </p>
+                        <input
+                          type="text"
+                          placeholder={lang === 'ar' ? 'رمز صاحب العمل (مثال: EMP-XXXXXX)' : lang === 'en' ? 'Employer Code (e.g. EMP-123456)' : 'Arbeitgeber-Code (z.B. EMP-123456)'}
+                          value={employerCodeInput}
+                          onChange={e => setEmployerCodeInput(e.target.value)}
+                          className="w-full bg-white border border-purple-200 rounded-xl px-3 py-2 text-sm text-purple-900 outline-none focus:border-purple-500"
+                        />
+                        <Button variant="primary" onClick={handleLinkEmployer} disabled={linkingEmployerState || !employerCodeInput.trim()} className="w-full justify-center">
+                          {linkingEmployerState ? '…' : (lang === 'ar' ? 'ربط الحساب' : lang === 'en' ? 'Link Account' : 'Konto verknüpfen')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {currentUser.role === 'EMPLOYER' && (
+                <>
+                  <Divider />
+                  <SectionHeader>{lang === 'ar' ? 'رمز مشاركة العمال' : lang === 'en' ? 'Employer Share Code' : 'Arbeitgeber-Freigabecode'}</SectionHeader>
+                  <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 flex flex-col gap-2">
+                    <p className="text-xs text-purple-600">
+                      {lang === 'ar' ? 'شارك هذا الرمز مع عمالك ليرتبطوا بحسابك وتتمكن من رؤية ساعاتهم:' : lang === 'en' ? 'Share this code with your workers to link them to your account:' : 'Teilen Sie diesen Code mit Ihren Mitarbeitern, um sie zu verknüpfen:'}
+                    </p>
+                    <div className="flex items-center gap-2 bg-white border border-purple-200 rounded-xl p-3 justify-between">
+                      <span className="font-mono font-bold text-lg text-purple-900 select-all">{currentUser.employerCode}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(currentUser.employerCode);
+                          toast.success(lang === 'ar' ? 'تم نسخ الرمز!' : 'Copied!');
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-900 font-bold cursor-pointer"
+                      >
+                        {lang === 'ar' ? 'نسخ' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

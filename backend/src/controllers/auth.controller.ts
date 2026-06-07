@@ -15,12 +15,22 @@ import {
 const PROD = process.env.NODE_ENV === 'production';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+import { AuthRequest } from '../middlewares/auth.middleware';
+
 function gen6DigitCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 function formatUser(u: any) {
-  return { id: u.id, email: u.email, name: u.name, role: u.role, plan: u.plan };
+  return { 
+    id: u.id, 
+    email: u.email, 
+    name: u.name, 
+    role: u.role, 
+    plan: u.plan,
+    employerCode: u.employerCode,
+    employerId: u.employerId
+  };
 }
 
 async function issueSession(res: Response, userId: string) {
@@ -45,14 +55,28 @@ async function issueSession(res: Response, userId: string) {
 // ── REGISTER ─────────────────────────────────────────────────────────────────
 export const register = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, name, plan } = req.body;
+    const { email, password, name, plan, role } = req.body;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return res.status(400).json({ error: 'Email already in use' });
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const code   = gen6DigitCode();
-    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    let employerCode = null;
+    const resolvedRole = (role === 'EMPLOYER') ? 'EMPLOYER' : 'USER';
+    if (resolvedRole === 'EMPLOYER') {
+      employerCode = 'EMP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+      // Ensure unique code
+      let isUnique = false;
+      while (!isUnique) {
+        const check = await prisma.user.findUnique({ where: { employerCode } });
+        if (!check) {
+          isUnique = true;
+        } else {
+          employerCode = 'EMP-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+        }
+      }
+    }
 
     const user = await prisma.user.create({
       data: { 
@@ -62,6 +86,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         verificationCode: null, 
         verificationCodeExpiry: null,
         emailVerified: true,
+        role: resolvedRole,
+        employerCode,
         plan: (plan?.toUpperCase() === 'PRO') ? 'PRO' : 'FREE'
       },
     });
@@ -327,6 +353,54 @@ export const support = async (req: Request, res: Response, next: NextFunction) =
     await sendSupportEmail(name, email, phone || 'Not provided', message);
 
     res.status(200).json({ success: true, message: 'Your support request has been sent successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── LINK/UNLINK EMPLOYER ──────────────────────────────────────────────────────
+export const linkEmployer = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { code } = req.body;
+    if (!code || typeof code !== 'string') {
+      return res.status(400).json({ error: 'Employer code is required' });
+    }
+
+    const employer = await prisma.user.findUnique({
+      where: { employerCode: code.trim().toUpperCase() }
+    });
+
+    if (!employer || employer.role !== 'EMPLOYER') {
+      return res.status(404).json({ error: 'No employer found with this code' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { employerId: employer.id }
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: `Successfully linked to employer: ${employer.name || employer.email}`,
+      user: formatUser(updatedUser)
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unlinkEmployer = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const updatedUser = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { employerId: null }
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Successfully unlinked from employer',
+      user: formatUser(updatedUser)
+    });
   } catch (err) {
     next(err);
   }

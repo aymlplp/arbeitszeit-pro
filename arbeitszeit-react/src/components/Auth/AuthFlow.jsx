@@ -21,7 +21,7 @@ export default function AuthFlow({ onSuccess }) {
   const [code,    setCode]    = useState(['','','','','',''])
 
   // Form state
-  const [form, setForm] = useState({ name: '', email: '', password: '', plan: 'free' })
+  const [form, setForm] = useState({ name: '', email: '', password: '', plan: 'free', role: 'USER' })
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const cycleLang = () => {
@@ -42,9 +42,11 @@ export default function AuthFlow({ onSuccess }) {
   })
 
   const doRegister = () => wrap(async () => {
-    if (!form.name || !form.email || !form.password) throw new Error('Alle Felder erforderlich')
-    const d = await register(form.name, form.email, form.password, form.plan)
-    toast.success('Konto erfolgreich erstellt!')
+    if (!form.name || !form.email || !form.password) {
+      throw new Error(lang === 'ar' ? 'جميع الحقول مطلوبة' : lang === 'en' ? 'All fields are required' : 'Alle Felder erforderlich')
+    }
+    const d = await register(form.name, form.email, form.password, form.plan, form.role)
+    toast.success(lang === 'ar' ? 'تم إنشاء الحساب بنجاح!' : 'Konto erfolgreich erstellt!')
     if (d?.needsVerification) {
       setUserId(d.userId)
       setScreen('verify')
@@ -149,29 +151,48 @@ export default function AuthFlow({ onSuccess }) {
           {/* ── REGISTER ── */}
           {screen === 'register' && (
             <motion.div key="register" {...ANIM} className={CARD}>
-              <div className="text-base font-bold text-purple-900 mb-1">Konto erstellen</div>
-              <div className="text-xs text-purple-500 mb-5">14 Tage kostenlos — keine Kreditkarte</div>
+              <div className="text-base font-bold text-purple-900 mb-1">{lang === 'ar' ? 'إنشاء حساب' : 'Konto erstellen'}</div>
+              <div className="text-xs text-purple-500 mb-5">{lang === 'ar' ? 'تتبع ساعات العمل بكل سهولة' : 'Zeiterfassung leicht gemacht'}</div>
               <div className="space-y-3 mb-3">
-                <input type="text" placeholder="Vollständiger Name" value={form.name}
+                <input type="text" placeholder={lang === 'ar' ? 'الاسم الكامل' : 'Vollständiger Name'} value={form.name}
                   onChange={e => setF('name', e.target.value)} className={INP} />
                 <input type="email" placeholder="E-Mail" value={form.email}
                   onChange={e => setF('email', e.target.value)} className={INP} />
-                <input type="password" placeholder="Passwort (Min. 8 Zeichen, 1 Großbuchstabe, 1 Zahl)" value={form.password}
+                <input type="password" placeholder={lang === 'ar' ? 'كلمة المرور' : 'Passwort'} value={form.password}
                   onChange={e => setF('password', e.target.value)} className={INP} />
+                
+                {/* Role selector */}
+                <div className="text-xs font-bold text-purple-600/70 mb-1">{lang === 'ar' ? 'أنا أريد التسجيل كـ:' : lang === 'en' ? 'I want to register as:' : 'Ich möchte mich registrieren als:'}</div>
                 <div className="grid grid-cols-2 gap-2">
-                  {[{ v: 'free', l: 'Free (0€)' }, { v: 'pro', l: proLabel }].map(p => (
-                    <button key={p.v} onClick={() => setF('plan', p.v)}
+                  {[{ v: 'USER', l: lang === 'ar' ? 'عامل' : lang === 'en' ? 'Worker' : 'Mitarbeiter' }, 
+                    { v: 'EMPLOYER', l: lang === 'ar' ? 'صاحب عمل' : lang === 'en' ? 'Employer' : 'Arbeitgeber' }].map(r => (
+                    <button key={r.v} type="button" onClick={() => setF('role', r.v)}
                       className={`text-xs py-2 px-3 rounded-xl border font-semibold transition-all cursor-pointer
-                        ${form.plan === p.v ? 'bg-purple-600 text-white border-transparent' : 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400'}`}>
-                      {p.l}
+                        ${form.role === r.v ? 'bg-purple-600 text-white border-transparent' : 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400'}`}>
+                      {r.l}
                     </button>
                   ))}
                 </div>
+
+                {form.role === 'USER' && (
+                  <>
+                    <div className="text-xs font-bold text-purple-600/70 mb-1">{lang === 'ar' ? 'الباقة:' : 'Plan:'}</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[{ v: 'free', l: 'Free (0€)' }, { v: 'pro', l: proLabel }].map(p => (
+                        <button key={p.v} type="button" onClick={() => setF('plan', p.v)}
+                          className={`text-xs py-2 px-3 rounded-xl border font-semibold transition-all cursor-pointer
+                            ${form.plan === p.v ? 'bg-purple-600 text-white border-transparent' : 'bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-400'}`}>
+                          {p.l}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
               <button onClick={doRegister} disabled={loading} className={BTN}>
-                {loading ? '…' : 'Konto erstellen →'}
+                {loading ? '…' : (lang === 'ar' ? 'إنشاء حساب ←' : 'Konto erstellen →')}
               </button>
-              <button onClick={() => setScreen('login')} className={`${GHOST} mt-2`}>← Zurück</button>
+              <button onClick={() => setScreen('login')} className={`${GHOST} mt-2`}>{lang === 'ar' ? '← رجوع' : '← Zurück'}</button>
             </motion.div>
           )}
 

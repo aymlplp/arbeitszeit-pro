@@ -9,6 +9,7 @@ import { errorHandler } from './middlewares/error.middleware';
 import authRoutes from './routes/auth.routes';
 import dataRoutes from './routes/data.routes';
 import stripeRoutes from './routes/stripe.routes';
+import employerRoutes from './routes/employer.routes';
 
 import { handleWebhook } from './controllers/stripe.controller';
 
@@ -59,6 +60,7 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api/data', dataRoutes);
 app.use('/api/stripe', stripeRoutes);
+app.use('/api/employer', employerRoutes);
 
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'API is healthy' });

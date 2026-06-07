@@ -97,8 +97,8 @@ export async function login(email, password) {
   return data.user
 }
 
-export async function register(name, email, password, plan = 'free') {
-  const res  = await request('POST', '/auth/register', { name, email, password, plan })
+export async function register(name, email, password, plan = 'free', role = 'USER') {
+  const res  = await request('POST', '/auth/register', { name, email, password, plan, role })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Registration failed')
   setAuthToken(data.accessToken)
@@ -188,6 +188,42 @@ export async function openBillingPortal() {
 
 export async function sendSupportRequest(name, email, phone, message) {
   const res  = await request('POST', '/auth/support', { name, email, phone, message }, false)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data
+}
+
+// ── Employer/Worker linking ─────────────────────────────────────
+export async function linkEmployer(code) {
+  const res  = await request('POST', '/auth/link-employer', { code }, true)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data
+}
+
+export async function unlinkEmployer() {
+  const res  = await request('POST', '/auth/unlink-employer', null, true)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data
+}
+
+export async function getEmployerWorkers() {
+  const res  = await request('GET', '/employer/workers', null, true)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data.workers
+}
+
+export async function getWorkerYears(workerId) {
+  const res  = await request('GET', `/employer/workers/${workerId}/years`, null, true)
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error)
+  return data.years
+}
+
+export async function getWorkerYearData(workerId, year) {
+  const res  = await request('GET', `/employer/workers/${workerId}/year/${year}`, null, true)
   const data = await res.json()
   if (!res.ok) throw new Error(data.error)
   return data

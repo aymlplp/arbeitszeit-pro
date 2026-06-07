@@ -10,6 +10,7 @@ datasource db {
 
 enum Role {
   USER
+  EMPLOYER
   ADMIN
 }
 
@@ -26,6 +27,12 @@ model User {
   role          Role         @default(USER)
   plan          Plan         @default(FREE)
   stripeCustId  String?      @unique
+
+  // Employer relationship
+  employerId    String?
+  employerCode  String?      @unique
+  employer      User?        @relation("EmployerWorkers", fields: [employerId], references: [id], onDelete: SetNull)
+  workers       User[]       @relation("EmployerWorkers")
 
   // Email verification
   emailVerified           Boolean   @default(false)
