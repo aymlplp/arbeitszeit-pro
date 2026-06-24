@@ -155,7 +155,7 @@ export default function ReportsView({ t }) {
         let cells = Array(7).fill('<td></td>')
         cells[i] = `<td class="${RCLS[typ]||''}" style="font-weight:bold;font-size:12px">${letter}</td>`
         nonWorkRows += `<tr>
-          <td colspan="2"></td>
+          <td></td>
           ${cells.join('')}
           <td class="rg"></td>
         </tr>`
@@ -163,23 +163,27 @@ export default function ReportsView({ t }) {
         ;(dayData.entries || []).forEach(e => {
           const area = e.obj || e.area || ''
           const activity = e.taet || e.activity || ''
-          const key = `${area}||${activity}`
+          const key = area || ''
+
+          if (!groups[key]) {
+            groups[key] = { area, cells: Array(7).fill(''), cellClasses: Array(7).fill(''), totalMins: 0 }
+          }
 
           if (e.days) {
-            if (!groups[key + '||days']) {
-              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
-            }
             e.days.forEach((dd, idx) => {
               const rc = RCLS[(e.tg || [])[idx]] || ''
-              groups[key + '||days'].cells[idx] = `<td${rc ? ` class="${rc}"` : ''} style="font-size:10px;font-family:monospace">${dd || ''}</td>`
+              if (dd || rc) {
+                const entryText = activity ? `<strong>${activity}</strong><br/>${dd}` : dd
+                groups[key].cells[idx] = groups[key].cells[idx] ? `${groups[key].cells[idx]}<br/>${entryText}` : entryText
+                if (rc) {
+                  groups[key].cellClasses[idx] = rc
+                }
+              }
             })
             const mins = cA(e) * 60
             tA += mins
-            groups[key + '||days'].totalMins += mins
+            groups[key].totalMins += mins
           } else {
-            if (!groups[key]) {
-              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
-            }
             const range = e.start && e.end ? `${e.start}–${e.end}` : ''
             const mins = (() => {
               if (e.start && e.end) {
@@ -193,7 +197,8 @@ export default function ReportsView({ t }) {
             const pause = (parseFloat(e.pause) || 0) * 60
 
             if (range) {
-              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
+              const entryText = activity ? `<strong>${activity}</strong><br/>${range}` : range
+              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${entryText}` : entryText
             }
 
             tA += mins
@@ -214,15 +219,12 @@ export default function ReportsView({ t }) {
     // Render grouped work rows
     Object.values(groups).forEach(g => {
       const cellsHtml = g.cells.map((cellContent, idx) => {
-        if (g.isDays) {
-          return cellContent || '<td></td>'
-        }
-        return `<td>${cellContent || ''}</td>`
+        const rc = g.cellClasses[idx] || ''
+        return `<td${rc ? ` class="${rc}"` : ''}>${cellContent || ''}</td>`
       }).join('')
 
       rows += `<tr>
         <td style="text-align:left;font-weight:500">${g.area}</td>
-        <td>${g.activity}</td>
         ${cellsHtml}
         <td class="rg" style="font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
       </tr>`
@@ -231,24 +233,23 @@ export default function ReportsView({ t }) {
     // Append non-work day rows at the bottom
     rows += nonWorkRows
 
-    if(!rows) rows=`<tr><td colspan="10" style="text-align:center;color:#888;padding:5px">${g('noE')}</td></tr>`
+    if(!rows) rows=`<tr><td colspan="9" style="text-align:center;color:#888;padding:5px">${g('noE')}</td></tr>`
 
     const hdrs = dayFull.map((dd,i)=>
       `<th class="r2">${dd.slice(0,dn)}<br><span style="font-weight:400;font-size:9px">${fmt(dts[i])}</span></th>`
     ).join('')
 
     const hdr = showHdr
-      ? `<tr><th colspan="10" class="r1" style="text-align:left;padding:5px 7px;font-size:12px">${co}${settings.phone?` &nbsp;|&nbsp; ${settings.phone}`:''}</th></tr>
-         <tr><th colspan="5" class="r1" style="text-align:left;padding:3px 7px">${g('mit')}: ${em}</th><th colspan="5" class="r1" style="text-align:right;padding:3px 7px;font-size:10px">${settings.email||''}</th></tr>`
+      ? `<tr><th colspan="9" class="r1" style="text-align:left;padding:5px 7px;font-size:12px">${co}${settings.phone?` &nbsp;|&nbsp; ${settings.phone}`:''}</th></tr>
+         <tr><th colspan="5" class="r1" style="text-align:left;padding:3px 7px">${g('mit')}: ${em}</th><th colspan="4" class="r1" style="text-align:right;padding:3px 7px;font-size:10px">${settings.email||''}</th></tr>`
       : ''
 
     return `
     <thead>
       ${hdr}
-      <tr><th colspan="10" class="r2" style="text-align:left;padding:3px 7px">KW ${kw} | ${fmt(dts[0])} – ${fmtY(dts[6])}</th></tr>
+      <tr><th colspan="9" class="r2" style="text-align:left;padding:3px 7px">KW ${kw} | ${fmt(dts[0])} – ${fmtY(dts[6])}</th></tr>
       <tr>
         <th class="r2" style="text-align:left">${g('obj')}</th>
-        <th class="r2">${g('tat')}</th>
         ${hdrs}
         <th class="r2">${g('ges')}</th>
       </tr>
@@ -256,22 +257,22 @@ export default function ReportsView({ t }) {
     <tbody>
       ${rows}
       <tr>
-        <td colspan="2" class="rg" style="text-align:right;font-weight:500">${g('arb')}</td>
+        <td class="rg" style="text-align:right;font-weight:500">${g('arb')}</td>
         ${dA.map(v => `<td class="rg">${v>0?fH(v):''}</td>`).join('')}
         <td class="rg">${fH(tA)}</td>
       </tr>
       <tr>
-        <td colspan="2" class="rbl" style="text-align:right;font-weight:500">${g('fahr')}</td>
+        <td class="rbl" style="text-align:right;font-weight:500">${g('fahr')}</td>
         ${dF.map(v => `<td class="rbl">${v>0?fH(v):''}</td>`).join('')}
         <td class="rbl">${fH(tf)}</td>
       </tr>
       <tr>
-        <td colspan="2" class="ro" style="text-align:right;font-weight:500">${g('pau')}</td>
+        <td class="ro" style="text-align:right;font-weight:500">${g('pau')}</td>
         ${dP.map(v => `<td class="ro">${v>0?fH(v):''}</td>`).join('')}
         <td class="ro">${fH(tp2)}</td>
       </tr>
       <tr>
-        <td colspan="9" style="text-align:right;font-weight:500;background:#f5f5f5">${g('ges')} KW ${kw}</td>
+        <td colspan="8" style="text-align:right;font-weight:500;background:#f5f5f5">${g('ges')} KW ${kw}</td>
         <td class="rtot">${fH(tA+tf-tp2)}</td>
       </tr>
     </tbody>`
@@ -315,12 +316,12 @@ export default function ReportsView({ t }) {
     }
     html+=`
     <table class="rt" style="margin-top:12px">
-      <thead><tr><th colspan="10" class="r1" style="text-align:left;padding:5px 7px">${g('mo2')}: ${months[base.getMonth()]} ${base.getFullYear()}</th></tr></thead>
+      <thead><tr><th colspan="9" class="r1" style="text-align:left;padding:5px 7px">${g('mo2')}: ${months[base.getMonth()]} ${base.getFullYear()}</th></tr></thead>
       <tbody>
-        <tr><td colspan="9" class="rg"  style="text-align:right;font-weight:500">${g('arb')}</td><td class="rg" >${fH(mA)}</td></tr>
-        <tr><td colspan="9" class="rbl" style="text-align:right;font-weight:500">${g('fahr')}</td><td class="rbl">${fH(mF)}</td></tr>
-        <tr><td colspan="9" class="ro"  style="text-align:right;font-weight:500">${g('pau')}</td><td class="ro" >${fH(mP)}</td></tr>
-        <tr><td colspan="9" style="text-align:right;font-weight:500;background:#f5f5f5">${g('gmo')}</td><td class="rtot" style="font-size:13px">${fH(mA+mF-mP)}</td></tr>
+        <tr><td colspan="8" class="rg"  style="text-align:right;font-weight:500">${g('arb')}</td><td class="rg" >${fH(mA)}</td></tr>
+        <tr><td colspan="8" class="rbl" style="text-align:right;font-weight:500">${g('fahr')}</td><td class="rbl">${fH(mF)}</td></tr>
+        <tr><td colspan="8" class="ro"  style="text-align:right;font-weight:500">${g('pau')}</td><td class="ro" >${fH(mP)}</td></tr>
+        <tr><td colspan="8" style="text-align:right;font-weight:500;background:#f5f5f5">${g('gmo')}</td><td class="rtot" style="font-size:13px">${fH(mA+mF-mP)}</td></tr>
       </tbody>
     </table>
     ${daySummary(allKeys)}`
