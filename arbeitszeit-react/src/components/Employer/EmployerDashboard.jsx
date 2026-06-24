@@ -419,7 +419,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
         let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
         cells[i] = `<td style="${RCLS_INLINE[typ] || styleTd}; font-weight:bold; font-size:12px">${letter}</td>`
         nonWorkRows += `<tr>
-          <td style="${styleTd}"></td>
+          <td colspan="2" style="${styleTd}"></td>
           ${cells.join('')}
           <td style="${styleRg}"></td>
         </tr>`
@@ -427,7 +427,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
         ;(dayData.entries || []).forEach(e => {
           const area = e.obj || e.area || ''
           const activity = e.taet || e.activity || ''
-          const key = area || ''
+          const key = `${area}||${activity}`
           
           const pT = s => {
             if (!s||!s.trim()) return 0
@@ -437,25 +437,21 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
           }
           const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
 
-          if (!groups[key]) {
-            groups[key] = { area, cells: Array(7).fill(''), cellClasses: Array(7).fill(''), totalMins: 0 }
-          }
-
           if (e.days) {
+            if (!groups[key + '||days']) {
+              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
+            }
             e.days.forEach((dd, idx) => {
-              const rc = (e.tg || [])[idx] ? RCLS_INLINE[(e.tg || [])[idx]] : null
-              if (dd || rc) {
-                const entryText = activity ? `<strong>${activity}</strong><br/>${dd}` : dd
-                groups[key].cells[idx] = groups[key].cells[idx] ? `${groups[key].cells[idx]}<br/>${entryText}` : entryText
-                if (rc) {
-                  groups[key].cellClasses[idx] = rc
-                }
-              }
+              const rc = (e.tg || [])[idx] ? RCLS_INLINE[(e.tg || [])[idx]] : styleTd
+              groups[key + '||days'].cells[idx] = `<td style="${rc}; font-size:10px; font-family:monospace">${dd||''}</td>`
             })
             const mins = cA(e)*60
             tA += mins
-            groups[key].totalMins += mins
+            groups[key + '||days'].totalMins += mins
           } else {
+            if (!groups[key]) {
+              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
+            }
             const range = e.start&&e.end ? `${e.start}–${e.end}` : ''
             const mins = (() => {
               if (e.start && e.end) {
@@ -466,8 +462,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
             })()
 
             if (range) {
-              const entryText = activity ? `<strong>${activity}</strong><br/>${range}` : range
-              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${entryText}` : entryText
+              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
             }
 
             tA += mins
@@ -488,12 +483,15 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     // Render grouped work rows
     Object.values(groups).forEach(g => {
       const cellsHtml = g.cells.map((cellContent, idx) => {
-        const rc = g.cellClasses[idx] || styleTd
-        return `<td style="${rc}">${cellContent || ''}</td>`
+        if (g.isDays) {
+          return cellContent || `<td style="${styleTd}"></td>`
+        }
+        return `<td style="${styleTd}">${cellContent || ''}</td>`
       }).join('')
 
       rows += `<tr>
         <td style="${styleTd}; text-align:left; font-weight:500">${g.area}</td>
+        <td style="${styleTd}">${g.activity}</td>
         ${cellsHtml}
         <td style="${styleRg}; font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
       </tr>`
@@ -503,7 +501,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     rows += nonWorkRows
 
     const noELbl = lang === 'ar' ? 'لا إدخالات' : lang === 'en' ? 'No entries' : 'Keine Einträge'
-    if(!rows) rows=`<tr><td colspan="9" style="${styleTd}; text-align:center; color:#888; padding:5px">${noELbl}</td></tr>`
+    if(!rows) rows=`<tr><td colspan="10" style="${styleTd}; text-align:center; color:#888; padding:5px">${noELbl}</td></tr>`
 
     const hdrs = (DAYS_OF_WEEK[lang] || DAYS_OF_WEEK.de).map((dd,i)=>
       `<th style="${styleR2}">${dd.slice(0,dn)}<br><span style="font-weight:400;font-size:9px">${formatDDMMLocal(dts[i])}</span></th>`
@@ -516,22 +514,24 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
 
     const mitLbl = lang === 'ar' ? 'الموظف' : lang === 'en' ? 'Employee' : 'Mitarbeiter'
     const objLbl = lang === 'ar' ? 'الموقع' : lang === 'en' ? 'Site' : 'Objekt'
+    const tatLbl = lang === 'ar' ? 'النشاط' : lang === 'en' ? 'Activity' : 'Tätigkeit'
     const gesLbl = lang === 'ar' ? 'الإجمالي' : lang === 'en' ? 'Total' : 'Gesamt'
     const arbLbl = lang === 'ar' ? 'ساعات العمل' : lang === 'en' ? 'Work Time' : 'Arbeitszeit'
     const fahrLbl = lang === 'ar' ? 'القيادة' : lang === 'en' ? 'Drive Time' : 'Fahrzeit'
     const pauLbl = lang === 'ar' ? 'الاستراحة' : lang === 'en' ? 'Break' : 'Pause'
 
     const hdr = showHdr
-      ? `<tr><th colspan="9" style="${styleR1}; text-align:left; padding:5px 7px; font-size:12px">${co}${phone ? ` &nbsp;|&nbsp; ${phone}` : ''}</th></tr>
-         <tr><th colspan="5" style="${styleR1}; text-align:left; padding:3px 7px">${mitLbl}: ${em}</th><th colspan="4" style="${styleR1}; text-align:right; padding:3px 7px; font-size:10px">${email}</th></tr>`
+      ? `<tr><th colspan="10" style="${styleR1}; text-align:left; padding:5px 7px; font-size:12px">${co}${phone ? ` &nbsp;|&nbsp; ${phone}` : ''}</th></tr>
+         <tr><th colspan="5" style="${styleR1}; text-align:left; padding:3px 7px">${mitLbl}: ${em}</th><th colspan="5" style="${styleR1}; text-align:right; padding:3px 7px; font-size:10px">${email}</th></tr>`
       : ''
 
     return `
     <thead>
       ${hdr}
-      <tr><th colspan="9" style="${styleR2}; text-align:left; padding:3px 7px">KW ${kw} | ${formatDDMMLocal(dts[0])} – ${formatFullLocal(dts[6])}</th></tr>
+      <tr><th colspan="10" style="${styleR2}; text-align:left; padding:3px 7px">KW ${kw} | ${formatDDMMLocal(dts[0])} – ${formatFullLocal(dts[6])}</th></tr>
       <tr>
         <th style="${styleR2}; text-align:left">${objLbl}</th>
+        <th style="${styleR2}">${tatLbl}</th>
         ${hdrs}
         <th style="${styleR2}">${gesLbl}</th>
       </tr>
@@ -539,22 +539,22 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     <tbody>
       ${rows}
       <tr>
-        <td style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
+        <td colspan="2" style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
         ${dA.map(v => `<td style="${styleRg}">${v>0?fH(v):''}</td>`).join('')}
         <td style="${styleRg}">${fH(tA)}</td>
       </tr>
       <tr>
-        <td style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
+        <td colspan="2" style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
         ${dF.map(v => `<td style="${styleRbl}">${v>0?fH(v):''}</td>`).join('')}
         <td style="${styleRbl}">${fH(tf)}</td>
       </tr>
       <tr>
-        <td style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
+        <td colspan="2" style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
         ${dP.map(v => `<td style="${styleRo}">${v>0?fH(v):''}</td>`).join('')}
         <td style="${styleRo}">${fH(tp2)}</td>
       </tr>
       <tr>
-        <td colspan="8" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gesLbl} KW ${kw}</td>
+        <td colspan="9" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gesLbl} KW ${kw}</td>
         <td style="${styleRtot}">${fH(tA+tf-tp2)}</td>
       </tr>
     </tbody>`
@@ -660,26 +660,26 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     <table style="border-collapse:collapse; width:100%; margin-top:12px">
       <thead>
         <tr>
-          <th colspan="9" style="${styleR1}; text-align:left; padding:5px 7px">
+          <th colspan="10" style="${styleR1}; text-align:left; padding:5px 7px">
             ${mo2Lbl}: ${MONTHS_OF_YEAR[lang]?.[selectedMonth]} ${selectedYear}
           </th>
         </tr>
       </thead>
       <tbody>
         <tr>
-          <td colspan="8" style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
+          <td colspan="9" style="${styleRg}; text-align:right; font-weight:500">${arbLbl}</td>
           <td style="${styleRg}">${fH(mA)}</td>
         </tr>
         <tr>
-          <td colspan="8" style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
+          <td colspan="9" style="${styleRbl}; text-align:right; font-weight:500">${fahrLbl}</td>
           <td style="${styleRbl}">${fH(mF)}</td>
         </tr>
         <tr>
-          <td colspan="8" style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
+          <td colspan="9" style="${styleRo}; text-align:right; font-weight:500">${pauLbl}</td>
           <td style="${styleRo}">${fH(mP)}</td>
         </tr>
         <tr>
-          <td colspan="8" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gmoLbl}</td>
+          <td colspan="9" style="${styleTd}; text-align:right; font-weight:500; background-color:#f5f5f5">${gmoLbl}</td>
           <td style="${styleRtot}; font-size:13px">${fH(mA + mF - mP)}</td>
         </tr>
       </tbody>
