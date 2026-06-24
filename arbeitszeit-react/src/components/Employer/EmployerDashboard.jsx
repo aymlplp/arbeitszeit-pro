@@ -394,6 +394,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     let tA=0, tf=0, tp2=0
     let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
     let rows = ''
+    let nonWorkRows = ''
     
     const formatDDMMLocal = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.`
     const formatFullLocal = d => formatDDMMLocal(d) + d.getFullYear()
@@ -403,6 +404,8 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
       holiday: styleRho,
       vacation: styleRva
     }
+
+    const groups = {}
 
     dts.forEach((d, i) => {
       const k = toISODate(d)
@@ -415,14 +418,16 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
                        typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
         let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
         cells[i] = `<td style="${RCLS_INLINE[typ] || styleTd}; font-weight:bold; font-size:12px">${letter}</td>`
-        rows += `<tr>
+        nonWorkRows += `<tr>
           <td colspan="2" style="${styleTd}"></td>
           ${cells.join('')}
           <td style="${styleRg}"></td>
         </tr>`
       } else {
         ;(dayData.entries || []).forEach(e => {
-          let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
+          const area = e.obj || e.area || ''
+          const activity = e.taet || e.activity || ''
+          const key = `${area}||${activity}`
           
           const pT = s => {
             if (!s||!s.trim()) return 0
@@ -433,35 +438,67 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
           const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
 
           if (e.days) {
-            cells = e.days.map((dd, idx) => {
+            if (!groups[key + '||days']) {
+              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
+            }
+            e.days.forEach((dd, idx) => {
               const rc = (e.tg || [])[idx] ? RCLS_INLINE[(e.tg || [])[idx]] : styleTd
-              return `<td style="${rc}; font-size:10px; font-family:monospace">${dd||''}</td>`
+              groups[key + '||days'].cells[idx] = `<td style="${rc}; font-size:10px; font-family:monospace">${dd||''}</td>`
             })
-            tA += cA(e)*60
+            const mins = cA(e)*60
+            tA += mins
+            groups[key + '||days'].totalMins += mins
           } else {
-            const range=e.start&&e.end?`${e.start}–${e.end}`:''
-            cells[i] = `<td style="${styleTd}; font-size:10px; font-family:monospace; font-weight:600">${range}</td>`
-            const mins=(()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
+            if (!groups[key]) {
+              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
+            }
+            const range = e.start&&e.end ? `${e.start}–${e.end}` : ''
+            const mins = (() => {
+              if (e.start && e.end) {
+                const t = parseTimeToMin(e.end) - parseTimeToMin(e.start)
+                return t > 0 ? t : 0
+              }
+              return 0
+            })()
+
+            if (range) {
+              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
+            }
+
             tA += mins
             dA[i] += mins
+
+            tf += (parseFloat(e.fahrt) || 0) * 60
+            dF[i] += (parseFloat(e.fahrt) || 0) * 60
+
+            tp2 += (parseFloat(e.pause) || 0) * 60
+            dP[i] += (parseFloat(e.pause) || 0) * 60
+
+            groups[key].totalMins += mins
           }
-          
-          tf += (parseFloat(e.fahrt)||0)*60
-          dF[i] += (parseFloat(e.fahrt)||0)*60
-          
-          tp2 += (parseFloat(e.pause)||0)*60
-          dP[i] += (parseFloat(e.pause)||0)*60
-          
-          const ar = e.days ? cA(e)*60 : (()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
-          rows += `<tr>
-            <td style="${styleTd}; text-align:left; font-weight:500">${e.obj||e.area||''}</td>
-            <td style="${styleTd}">${e.taet||e.activity||''}</td>
-            ${cells.join('')}
-            <td style="${styleRg}; font-weight:500">${ar>0?fH(ar):''}</td>
-          </tr>`
         })
       }
     })
+
+    // Render grouped work rows
+    Object.values(groups).forEach(g => {
+      const cellsHtml = g.cells.map((cellContent, idx) => {
+        if (g.isDays) {
+          return cellContent || `<td style="${styleTd}"></td>`
+        }
+        return `<td style="${styleTd}">${cellContent || ''}</td>`
+      }).join('')
+
+      rows += `<tr>
+        <td style="${styleTd}; text-align:left; font-weight:500">${g.area}</td>
+        <td style="${styleTd}">${g.activity}</td>
+        ${cellsHtml}
+        <td style="${styleRg}; font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
+      </tr>`
+    })
+
+    // Append non-work day rows at the bottom
+    rows += nonWorkRows
 
     const noELbl = lang === 'ar' ? 'لا إدخالات' : lang === 'en' ? 'No entries' : 'Keine Einträge'
     if(!rows) rows=`<tr><td colspan="10" style="${styleTd}; text-align:center; color:#888; padding:5px">${noELbl}</td></tr>`

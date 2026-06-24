@@ -139,7 +139,10 @@ export default function ReportsView({ t }) {
     let tA=0, tf=0, tp2=0
     let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
     let rows = ''
-    
+    let nonWorkRows = ''
+
+    const groups = {}
+
     dts.forEach((d, i) => {
       const k = getISODate(d)
       const dayData = aData[k] || {}
@@ -151,44 +154,79 @@ export default function ReportsView({ t }) {
                        typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
         let cells = Array(7).fill('<td></td>')
         cells[i] = `<td class="${RCLS[typ]||''}" style="font-weight:bold;font-size:12px">${letter}</td>`
-        rows += `<tr>
+        nonWorkRows += `<tr>
           <td colspan="2"></td>
           ${cells.join('')}
           <td class="rg"></td>
         </tr>`
       } else {
         ;(dayData.entries || []).forEach(e => {
-          let cells = Array(7).fill('<td></td>')
+          const area = e.obj || e.area || ''
+          const activity = e.taet || e.activity || ''
+          const key = `${area}||${activity}`
+
           if (e.days) {
-            cells = e.days.map((dd, idx) => {
-              const rc=RCLS[(e.tg||[])[idx]]||''
-              return `<td${rc?` class="${rc}"`:''}  style="font-size:10px;font-family:monospace">${dd||''}</td>`
+            if (!groups[key + '||days']) {
+              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
+            }
+            e.days.forEach((dd, idx) => {
+              const rc = RCLS[(e.tg || [])[idx]] || ''
+              groups[key + '||days'].cells[idx] = `<td${rc ? ` class="${rc}"` : ''} style="font-size:10px;font-family:monospace">${dd || ''}</td>`
             })
-            tA += cA(e)*60
+            const mins = cA(e) * 60
+            tA += mins
+            groups[key + '||days'].totalMins += mins
           } else {
-            const range=e.start&&e.end?`${e.start}–${e.end}`:''
-            cells[i] = `<td style="font-size:10px;font-family:monospace;font-weight:600">${range}</td>`
-            const mins=(()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
+            if (!groups[key]) {
+              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
+            }
+            const range = e.start && e.end ? `${e.start}–${e.end}` : ''
+            const mins = (() => {
+              if (e.start && e.end) {
+                const t = (+e.end.split(':')[0] * 60 + +e.end.split(':')[1]) - (+e.start.split(':')[0] * 60 + +e.start.split(':')[1]);
+                return t > 0 ? t : 0
+              }
+              return 0
+            })()
+
+            if (range) {
+              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
+            }
+
             tA += mins
             dA[i] += mins
+
+            tf += (parseFloat(e.fahrt) || 0) * 60
+            dF[i] += (parseFloat(e.fahrt) || 0) * 60
+
+            tp2 += (parseFloat(e.pause) || 0) * 60
+            dP[i] += (parseFloat(e.pause) || 0) * 60
+
+            groups[key].totalMins += mins
           }
-          
-          tf += (parseFloat(e.fahrt)||0)*60
-          dF[i] += (parseFloat(e.fahrt)||0)*60
-          
-          tp2 += (parseFloat(e.pause)||0)*60
-          dP[i] += (parseFloat(e.pause)||0)*60
-          
-          const ar = e.days ? cA(e)*60 : (()=>{if(e.start&&e.end){const t=(+e.end.split(':')[0]*60+ +e.end.split(':')[1])-(+e.start.split(':')[0]*60+ +e.start.split(':')[1]);return t>0?t:0}return 0})()
-          rows += `<tr>
-            <td style="text-align:left;font-weight:500">${e.obj||e.area||''}</td>
-            <td>${e.taet||e.activity||''}</td>
-            ${cells.join('')}
-            <td class="rg" style="font-weight:500">${ar>0?fH(ar):''}</td>
-          </tr>`
         })
       }
     })
+
+    // Render grouped work rows
+    Object.values(groups).forEach(g => {
+      const cellsHtml = g.cells.map((cellContent, idx) => {
+        if (g.isDays) {
+          return cellContent || '<td></td>'
+        }
+        return `<td>${cellContent || ''}</td>`
+      }).join('')
+
+      rows += `<tr>
+        <td style="text-align:left;font-weight:500">${g.area}</td>
+        <td>${g.activity}</td>
+        ${cellsHtml}
+        <td class="rg" style="font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
+      </tr>`
+    })
+
+    // Append non-work day rows at the bottom
+    rows += nonWorkRows
 
     if(!rows) rows=`<tr><td colspan="10" style="text-align:center;color:#888;padding:5px">${g('noE')}</td></tr>`
 
