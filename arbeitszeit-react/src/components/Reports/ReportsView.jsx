@@ -139,94 +139,96 @@ export default function ReportsView({ t }) {
     let tA=0, tf=0, tp2=0
     let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
     let rows = ''
-    let nonWorkRows = ''
 
-    const groups = {}
-
-    dts.forEach((d, i) => {
+    // 1. Determine max entries on any day to determine number of rows needed
+    let maxEntries = 0
+    dts.forEach((d) => {
       const k = getISODate(d)
       const dayData = aData[k] || {}
-      const typ = dayData.type || 'work'
-
-      if (typ !== 'work') {
-        const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
-                       typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
-                       typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
-        let cells = Array(7).fill('<td></td>')
-        cells[i] = `<td class="${RCLS[typ]||''}" style="font-weight:bold;font-size:12px">${letter}</td>`
-        nonWorkRows += `<tr>
-          <td colspan="2"></td>
-          ${cells.join('')}
-          <td class="rg"></td>
-        </tr>`
-      } else {
-        ;(dayData.entries || []).forEach(e => {
-          const area = e.obj || e.area || ''
-          const activity = e.taet || e.activity || ''
-          const key = `${area}||${activity}`
-
-          if (e.days) {
-            if (!groups[key + '||days']) {
-              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
-            }
-            e.days.forEach((dd, idx) => {
-              const rc = RCLS[(e.tg || [])[idx]] || ''
-              groups[key + '||days'].cells[idx] = `<td${rc ? ` class="${rc}"` : ''} style="font-size:10px;font-family:monospace">${dd || ''}</td>`
-            })
-            const mins = cA(e) * 60
-            tA += mins
-            groups[key + '||days'].totalMins += mins
-          } else {
-            if (!groups[key]) {
-              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
-            }
-            const range = e.start && e.end ? `${e.start}–${e.end}` : ''
-            const mins = (() => {
-              if (e.start && e.end) {
-                const t = (+e.end.split(':')[0] * 60 + +e.end.split(':')[1]) - (+e.start.split(':')[0] * 60 + +e.start.split(':')[1]);
-                return t > 0 ? t : 0
-              }
-              return 0
-            })()
-
-            if (range) {
-              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
-            }
-
-            tA += mins
-            dA[i] += mins
-
-            tf += (parseFloat(e.fahrt) || 0) * 60
-            dF[i] += (parseFloat(e.fahrt) || 0) * 60
-
-            tp2 += (parseFloat(e.pause) || 0) * 60
-            dP[i] += (parseFloat(e.pause) || 0) * 60
-
-            groups[key].totalMins += mins
-          }
-        })
+      if (dayData.type === 'work' || !dayData.type) {
+        const count = (dayData.entries || []).length
+        if (count > maxEntries) maxEntries = count
       }
     })
+    if (maxEntries === 0) maxEntries = 1
 
-    // Render grouped work rows
-    Object.values(groups).forEach(g => {
-      const cellsHtml = g.cells.map((cellContent, idx) => {
-        if (g.isDays) {
-          return cellContent || '<td></td>'
+    // 2. Build rows
+    for (let r = 0; r < maxEntries; r++) {
+      let rowWorkMins = 0
+      let cells = []
+
+      dts.forEach((d, i) => {
+        const k = getISODate(d)
+        const dayData = aData[k] || {}
+        const typ = dayData.type || 'work'
+
+        if (typ !== 'work') {
+          if (r === 0) {
+            const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
+                           typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
+                           typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
+            cells.push(`<td class="${RCLS[typ]||''}" style="font-weight:bold;font-size:12px;padding:8px 4px;">${letter}</td>`)
+          } else {
+            cells.push('<td></td>')
+          }
+        } else {
+          const entriesList = dayData.entries || []
+          if (r < entriesList.length) {
+            const e = entriesList[r]
+            const area = e.obj || e.area || ''
+            const activity = e.taet || e.activity || ''
+            
+            if (e.days) {
+              const rc = RCLS[(e.tg || [])[i]] || ''
+              cells.push(`<td${rc ? ` class="${rc}"` : ''} style="font-size:10px;font-family:monospace">${e.days[i] || ''}</td>`)
+              if (i === 0) {
+                tA += cA(e) * 60
+                rowWorkMins += cA(e) * 60
+              }
+            } else {
+              const range = e.start && e.end ? `${e.start}–${e.end}` : ''
+              const mins = (() => {
+                if (e.start && e.end) {
+                  const t = (+e.end.split(':')[0] * 60 + +e.end.split(':')[1]) - (+e.start.split(':')[0] * 60 + +e.start.split(':')[1]);
+                  return t > 0 ? t : 0
+                }
+                return 0
+              })()
+
+              const fahrt = (parseFloat(e.fahrt) || 0) * 60
+              const pause = (parseFloat(e.pause) || 0) * 60
+
+              tA += mins
+              dA[i] += mins
+
+              tf += fahrt
+              dF[i] += fahrt
+
+              tp2 += pause
+              dP[i] += pause
+
+              rowWorkMins += mins
+
+              const parts = []
+              if (area) parts.push(`<span style="font-weight:bold;display:block;margin-bottom:1px;font-size:9.5px;">${area}</span>`)
+              if (activity) parts.push(`<span style="color:#555;display:block;margin-bottom:1px;font-size:9px;">${activity}</span>`)
+              if (range) parts.push(`<span style="font-family:monospace;font-weight:600;font-size:9.5px;color:#111;">${range}</span>`)
+              
+              cells.push(`<td>${parts.join('')}</td>`)
+            }
+          } else {
+            cells.push('<td></td>')
+          }
         }
-        return `<td>${cellContent || ''}</td>`
-      }).join('')
+      })
 
+      const entryLabel = lang === 'ar' ? 'إدخال' : lang === 'en' ? 'Entry' : 'Eintrag'
       rows += `<tr>
-        <td style="text-align:left;font-weight:500">${g.area}</td>
-        <td>${g.activity}</td>
-        ${cellsHtml}
-        <td class="rg" style="font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
+        <td colspan="2" style="text-align:center;font-weight:bold;background:#fafafa;color:#555;font-size:10px;">${entryLabel} ${r + 1}</td>
+        ${cells.join('')}
+        <td class="rg" style="font-weight:500">${rowWorkMins > 0 ? fH(rowWorkMins) : ''}</td>
       </tr>`
-    })
-
-    // Append non-work day rows at the bottom
-    rows += nonWorkRows
+    }
 
     if(!rows) rows=`<tr><td colspan="10" style="text-align:center;color:#888;padding:5px">${g('noE')}</td></tr>`
 
@@ -244,8 +246,7 @@ export default function ReportsView({ t }) {
       ${hdr}
       <tr><th colspan="10" class="r2" style="text-align:left;padding:3px 7px">KW ${kw} | ${fmt(dts[0])} – ${fmtY(dts[6])}</th></tr>
       <tr>
-        <th class="r2" style="text-align:left">${g('obj')}</th>
-        <th class="r2">${g('tat')}</th>
+        <th colspan="2" class="r2" style="text-align:center">${lang==='ar'?'الإدخالات':lang==='en'?'Entries':'Einträge'}</th>
         ${hdrs}
         <th class="r2">${g('ges')}</th>
       </tr>

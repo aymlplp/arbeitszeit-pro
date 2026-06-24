@@ -394,7 +394,6 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     let tA=0, tf=0, tp2=0
     let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
     let rows = ''
-    let nonWorkRows = ''
     
     const formatDDMMLocal = d => `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.`
     const formatFullLocal = d => formatDDMMLocal(d) + d.getFullYear()
@@ -405,100 +404,103 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
       vacation: styleRva
     }
 
-    const groups = {}
-
-    dts.forEach((d, i) => {
+    // 1. Determine max entries on any day
+    let maxEntries = 0
+    dts.forEach((d) => {
       const k = toISODate(d)
       const dayData = workerData.data?.[k] || {}
-      const typ = dayData.type || 'work'
-
-      if (typ !== 'work') {
-        const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
-                       typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
-                       typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
-        let cells = Array(7).fill(`<td style="${styleTd}"></td>`)
-        cells[i] = `<td style="${RCLS_INLINE[typ] || styleTd}; font-weight:bold; font-size:12px">${letter}</td>`
-        nonWorkRows += `<tr>
-          <td colspan="2" style="${styleTd}"></td>
-          ${cells.join('')}
-          <td style="${styleRg}"></td>
-        </tr>`
-      } else {
-        ;(dayData.entries || []).forEach(e => {
-          const area = e.obj || e.area || ''
-          const activity = e.taet || e.activity || ''
-          const key = `${area}||${activity}`
-          
-          const pT = s => {
-            if (!s||!s.trim()) return 0
-            const m=s.trim().match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/)
-            if(!m)return 0
-            let d=(+m[3]*60+ +m[4])-(+m[1]*60+ +m[2]); return(d<0?d+1440:d)/60
-          }
-          const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
-
-          if (e.days) {
-            if (!groups[key + '||days']) {
-              groups[key + '||days'] = { area, activity, cells: Array(7).fill(''), totalMins: 0, isDays: true }
-            }
-            e.days.forEach((dd, idx) => {
-              const rc = (e.tg || [])[idx] ? RCLS_INLINE[(e.tg || [])[idx]] : styleTd
-              groups[key + '||days'].cells[idx] = `<td style="${rc}; font-size:10px; font-family:monospace">${dd||''}</td>`
-            })
-            const mins = cA(e)*60
-            tA += mins
-            groups[key + '||days'].totalMins += mins
-          } else {
-            if (!groups[key]) {
-              groups[key] = { area, activity, cells: Array(7).fill(''), totalMins: 0 }
-            }
-            const range = e.start&&e.end ? `${e.start}–${e.end}` : ''
-            const mins = (() => {
-              if (e.start && e.end) {
-                const t = parseTimeToMin(e.end) - parseTimeToMin(e.start)
-                return t > 0 ? t : 0
-              }
-              return 0
-            })()
-
-            if (range) {
-              groups[key].cells[i] = groups[key].cells[i] ? `${groups[key].cells[i]}<br/>${range}` : range
-            }
-
-            tA += mins
-            dA[i] += mins
-
-            tf += (parseFloat(e.fahrt) || 0) * 60
-            dF[i] += (parseFloat(e.fahrt) || 0) * 60
-
-            tp2 += (parseFloat(e.pause) || 0) * 60
-            dP[i] += (parseFloat(e.pause) || 0) * 60
-
-            groups[key].totalMins += mins
-          }
-        })
+      if (dayData.type === 'work' || !dayData.type) {
+        const count = (dayData.entries || []).length
+        if (count > maxEntries) maxEntries = count
       }
     })
+    if (maxEntries === 0) maxEntries = 1
 
-    // Render grouped work rows
-    Object.values(groups).forEach(g => {
-      const cellsHtml = g.cells.map((cellContent, idx) => {
-        if (g.isDays) {
-          return cellContent || `<td style="${styleTd}"></td>`
+    // 2. Build rows
+    for (let r = 0; r < maxEntries; r++) {
+      let rowWorkMins = 0
+      let cells = []
+
+      dts.forEach((d, i) => {
+        const k = toISODate(d)
+        const dayData = workerData.data?.[k] || {}
+        const typ = dayData.type || 'work'
+
+        if (typ !== 'work') {
+          if (r === 0) {
+            const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
+                           typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
+                           typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
+            cells.push(`<td style="${RCLS_INLINE[typ] || styleTd}; font-weight:bold; font-size:12px; padding:8px 4px;">${letter}</td>`)
+          } else {
+            cells.push(`<td style="${styleTd}"></td>`)
+          }
+        } else {
+          const entriesList = dayData.entries || []
+          if (r < entriesList.length) {
+            const e = entriesList[r]
+            const area = e.obj || e.area || ''
+            const activity = e.taet || e.activity || ''
+            
+            const pT = s => {
+              if (!s||!s.trim()) return 0
+              const m=s.trim().match(/^(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})$/)
+              if(!m)return 0
+              let d=(+m[3]*60+ +m[4])-(+m[1]*60+ +m[2]); return(d<0?d+1440:d)/60
+            }
+            const cA  = e => (e.days||[]).reduce((s,d)=>s+pT(d),0)
+
+            if (e.days) {
+              const rc = (e.tg || [])[i] ? RCLS_INLINE[(e.tg || [])[i]] : styleTd
+              cells.push(`<td style="${rc}; font-size:10px; font-family:monospace">${e.days[i] || ''}</td>`)
+              if (i === 0) {
+                tA += cA(e) * 60
+                rowWorkMins += cA(e) * 60
+              }
+            } else {
+              const range = e.start && e.end ? `${e.start}–${e.end}` : ''
+              const mins = (() => {
+                if (e.start && e.end) {
+                  const t = parseTimeToMin(e.end) - parseTimeToMin(e.start)
+                  return t > 0 ? t : 0
+                }
+                return 0
+              })()
+
+              const fahrt = (parseFloat(e.fahrt) || 0) * 60
+              const pause = (parseFloat(e.pause) || 0) * 60
+
+              tA += mins
+              dA[i] += mins
+
+              tf += fahrt
+              dF[i] += fahrt
+
+              tp2 += pause
+              dP[i] += pause
+
+              rowWorkMins += mins
+
+              const parts = []
+              if (area) parts.push(`<span style="font-weight:bold;display:block;margin-bottom:1px;font-size:9.5px;">${area}</span>`)
+              if (activity) parts.push(`<span style="color:#555;display:block;margin-bottom:1px;font-size:9px;">${activity}</span>`)
+              if (range) parts.push(`<span style="font-family:monospace;font-weight:600;font-size:9.5px;color:#111;">${range}</span>`)
+              
+              cells.push(`<td style="${styleTd}">${parts.join('')}</td>`)
+            }
+          } else {
+            cells.push(`<td style="${styleTd}"></td>`)
+          }
         }
-        return `<td style="${styleTd}">${cellContent || ''}</td>`
-      }).join('')
+      })
 
+      const entryLabel = lang === 'ar' ? 'إدخال' : lang === 'en' ? 'Entry' : 'Eintrag'
       rows += `<tr>
-        <td style="${styleTd}; text-align:left; font-weight:500">${g.area}</td>
-        <td style="${styleTd}">${g.activity}</td>
-        ${cellsHtml}
-        <td style="${styleRg}; font-weight:500">${g.totalMins > 0 ? fH(g.totalMins) : ''}</td>
+        <td colspan="2" style="${styleTd}; text-align:center; font-weight:bold; background-color:#fafafa; color:#555; font-size:10px;">${entryLabel} ${r + 1}</td>
+        ${cells.join('')}
+        <td style="${styleRg}; font-weight:500">${rowWorkMins > 0 ? fH(rowWorkMins) : ''}</td>
       </tr>`
-    })
-
-    // Append non-work day rows at the bottom
-    rows += nonWorkRows
+    }
 
     const noELbl = lang === 'ar' ? 'لا إدخالات' : lang === 'en' ? 'No entries' : 'Keine Einträge'
     if(!rows) rows=`<tr><td colspan="10" style="${styleTd}; text-align:center; color:#888; padding:5px">${noELbl}</td></tr>`
@@ -513,8 +515,6 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
     const phone = wSettings.phone || ''
 
     const mitLbl = lang === 'ar' ? 'الموظف' : lang === 'en' ? 'Employee' : 'Mitarbeiter'
-    const objLbl = lang === 'ar' ? 'الموقع' : lang === 'en' ? 'Site' : 'Objekt'
-    const tatLbl = lang === 'ar' ? 'النشاط' : lang === 'en' ? 'Activity' : 'Tätigkeit'
     const gesLbl = lang === 'ar' ? 'الإجمالي' : lang === 'en' ? 'Total' : 'Gesamt'
     const arbLbl = lang === 'ar' ? 'ساعات العمل' : lang === 'en' ? 'Work Time' : 'Arbeitszeit'
     const fahrLbl = lang === 'ar' ? 'القيادة' : lang === 'en' ? 'Drive Time' : 'Fahrzeit'
@@ -530,8 +530,7 @@ export default function EmployerDashboard({ currentUser, onLogout, lang = 'de' }
       ${hdr}
       <tr><th colspan="10" style="${styleR2}; text-align:left; padding:3px 7px">KW ${kw} | ${formatDDMMLocal(dts[0])} – ${formatFullLocal(dts[6])}</th></tr>
       <tr>
-        <th style="${styleR2}; text-align:left">${objLbl}</th>
-        <th style="${styleR2}">${tatLbl}</th>
+        <th colspan="2" style="${styleR2}; text-align:center">${lang==='ar'?'الإدخالات':lang==='en'?'Entries':'Einträge'}</th>
         ${hdrs}
         <th style="${styleR2}">${gesLbl}</th>
       </tr>
