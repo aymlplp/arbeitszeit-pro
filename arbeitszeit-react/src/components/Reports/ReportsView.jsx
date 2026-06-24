@@ -102,6 +102,7 @@ export default function ReportsView({ t }) {
     lh:   {de:'Feiertage',   en:'Holidays',    ar:'أيام العطل'},
     lv:   {de:'Urlaub',      en:'Vacation',    ar:'الإجازة'},
     noE:  {de:'Keine Einträge',en:'No entries',ar:'لا إدخالات'},
+    abs:  {de:'Status',      en:'Status',      ar:'نوع اليوم'},
   }
   const g = k => L[k]?.[lang]||L[k]?.de||k
 
@@ -139,7 +140,9 @@ export default function ReportsView({ t }) {
     let tA=0, tf=0, tp2=0
     let dA=Array(7).fill(0), dF=Array(7).fill(0), dP=Array(7).fill(0)
     let rows = ''
-    let nonWorkRows = ''
+    let hasNonWork = false
+    let nonWorkCells = Array(7).fill('')
+    let nonWorkClasses = Array(7).fill('')
 
     const groups = {}
 
@@ -149,17 +152,15 @@ export default function ReportsView({ t }) {
       const typ = dayData.type || 'work'
 
       if (typ !== 'work') {
+        hasNonWork = true
         const letter = typ === 'sick' ? (lang === 'ar' ? 'م' : lang === 'en' ? 'S' : 'K') :
                        typ === 'holiday' ? (lang === 'ar' ? 'ع' : lang === 'en' ? 'H' : 'F') :
                        typ === 'vacation' ? (lang === 'ar' ? 'إ' : lang === 'en' ? 'V' : 'U') : ''
-        let cells = Array(7).fill('<td></td>')
-        cells[i] = `<td class="${RCLS[typ]||''}" style="font-weight:bold;font-size:12px">${letter}</td>`
-        nonWorkRows += `<tr>
-          <td colspan="2"></td>
-          ${cells.join('')}
-          <td class="rg"></td>
-        </tr>`
-      } else {
+        nonWorkCells[i] = letter
+        nonWorkClasses[i] = RCLS[typ] || ''
+      }
+
+      if (typ === 'work') {
         ;(dayData.entries || []).forEach(e => {
           const area = e.obj || e.area || ''
           const activity = e.taet || e.activity || ''
@@ -228,8 +229,19 @@ export default function ReportsView({ t }) {
       </tr>`
     })
 
-    // Append non-work day rows at the bottom
-    rows += nonWorkRows
+    // Append non-work day row if any exists
+    if (hasNonWork) {
+      const cellsHtml = nonWorkCells.map((content, idx) => {
+        const rc = nonWorkClasses[idx] || ''
+        return `<td${rc ? ` class="${rc}"` : ''} style="font-weight:bold;font-size:12px">${content || ''}</td>`
+      }).join('')
+
+      rows += `<tr>
+        <td colspan="2" style="text-align:left;font-weight:500">${g('abs')}</td>
+        ${cellsHtml}
+        <td class="rg"></td>
+      </tr>`
+    }
 
     if(!rows) rows=`<tr><td colspan="10" style="text-align:center;color:#888;padding:5px">${g('noE')}</td></tr>`
 

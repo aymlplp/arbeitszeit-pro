@@ -1,4 +1,4 @@
-const CACHE_NAME = 'azp-v3';
+const CACHE_NAME = 'azp-v4';
 const ASSETS = [
   '/',
   '/index.html',
