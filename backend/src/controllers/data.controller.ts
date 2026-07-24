@@ -30,13 +30,6 @@ export const saveYearData = async (req: AuthRequest, res: Response, next: NextFu
     const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
-    if (user.plan !== 'PRO') {
-      return res.status(403).json({
-        error: 'Cloud synchronization is a premium feature. Please upgrade to PRO.',
-        code: 'PREMIUM_REQUIRED'
-      });
-    }
-
     const { data, settings } = req.body;
 
     const record = await prisma.yearData.upsert({

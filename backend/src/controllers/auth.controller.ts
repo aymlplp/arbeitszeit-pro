@@ -27,7 +27,7 @@ function formatUser(u: any) {
     email: u.email, 
     name: u.name, 
     role: u.role, 
-    plan: u.plan,
+    plan: 'PRO',
     employerCode: u.employerCode,
     employerId: u.employerId
   };
@@ -88,7 +88,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
         emailVerified: true,
         role: resolvedRole,
         employerCode,
-        plan: (plan?.toUpperCase() === 'PRO') ? 'PRO' : 'FREE'
+        plan: 'PRO'
       },
     });
 
