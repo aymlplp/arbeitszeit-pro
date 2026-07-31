@@ -40,7 +40,6 @@ A professional time-tracking web application for workers and freelancers. Built 
 | bcryptjs | 3.0 | Password hashing |
 | jsonwebtoken | 9.0 | JWT access + refresh tokens |
 | Resend | 6.12 | Transactional email |
-| Stripe | 22 | Subscriptions & billing |
 | Zod | 4 | Input validation schemas |
 | Helmet | 8 | HTTP security headers |
 | express-rate-limit | 8 | Rate limiting |
@@ -95,13 +94,11 @@ A professional time-tracking web application for workers and freelancers. Built 
     │   ├── controllers/
     │   │   ├── auth.controller.ts        # Register, login, refresh, logout, change/reset password
     │   │   ├── data.controller.ts        # Save & load YearData (time entries + settings)
-    │   │   ├── signSession.controller.ts # QR signing sessions
-    │   │   └── stripe.controller.ts      # Checkout, webhook, billing portal
+    │   │   └── signSession.controller.ts # QR signing sessions
     │   ├── routes/
     │   │   ├── auth.routes.ts
     │   │   ├── data.routes.ts
-    │   │   ├── signSession.routes.ts
-    │   │   └── stripe.routes.ts
+    │   │   └── signSession.routes.ts
     │   ├── middlewares/
     │   │   ├── auth.middleware.ts        # JWT verification
     │   │   ├── error.middleware.ts       # Global error handler
@@ -129,7 +126,6 @@ model User {
   passwordHash String
   role         Role       @default(USER)   // USER | ADMIN
   plan         Plan       @default(FREE)   // FREE | PRO
-  stripeCustId String?    @unique
   yearData     YearData[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -173,12 +169,6 @@ model YearData {
 | GET | `/:id` | Load session (used by mobile) |
 | POST | `/:id` | Submit signature from mobile |
 
-### Stripe — `/api/stripe`
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/create-checkout` | Create Stripe checkout session |
-| POST | `/webhook` | Handle Stripe events |
-| POST | `/billing-portal` | Open customer billing portal |
 
 ---
 
@@ -205,10 +195,6 @@ FRONTEND_URL=http://localhost:5000
 
 # Email (Resend)
 RESEND_API_KEY=re_xxxxxxxxxxxx
-
-# Stripe (optional)
-STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 ```
 
 ---
@@ -325,16 +311,6 @@ Language is stored in Zustand and persisted in localStorage. Switching language 
 
 ---
 
-## Monetization
-
-The app has a built-in FREE / PRO subscription model powered by Stripe:
-
-- **FREE** — basic time tracking, single work area
-- **PRO** — unlimited areas, full reports, cloud sync, signature features
-
-The upgrade prompt is shown in the app header for free users. Stripe checkout and billing portal are wired to the backend.
-
----
 
 ## Changelog
 
@@ -350,7 +326,6 @@ The upgrade prompt is shown in the app header for free users. Stripe checkout an
 - Wochenübersicht summary box made compact (SumBox smaller)
 - Welcome email sent in background via Resend API
 - Rate limiting added to all auth endpoints
-- Stripe billing portal integration
 - Full multilingual coverage (DE / EN / AR) across all views
 
 ### v1.0 — Initial Release
